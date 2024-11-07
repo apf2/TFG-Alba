@@ -1473,7 +1473,7 @@ def play_arpeggio(
     global up_arpeggiator, arpeggiator_active
     previous_notes_set = set()
 
-    while up_arpeggiator and arpeggiator_active:
+    while arpeggiator_active and up_arpeggiator:
         for note in list(active_notes):
             stop_note(note, selected_port_in, selected_port_out)
         current_shape = selected_shape.copy()
@@ -1591,11 +1591,11 @@ def toggle_arpeggiator(arpeggiator_on_button, window):
 
 
 # Función para desactivar un arpegiador
-def deactivate_arpeggiator(button):
+def deactivate_arpeggiator(arpeggiator_event):
     global up_arpeggiator
-    up_arpeggiator = False
-    button.state(["disabled"])
-    print("Arpegiador desactivado")
+
+    print("Cambio de modo de arpegiador")
+    arpeggiator_event.set()
 
 
 # Función para iniciaar el hilo del arpegiador
@@ -1614,34 +1614,39 @@ def start_arpeggiator(
     octave,
 ):
     global arpeggiator_event, arpeggiator_mode, arpeggiator_thread, up_arpeggiator
+    arpeggiator_thread = None
 
     # Si ya hay un arpegiador activo lo desactivamos
     if arpeggiator_mode and arpeggiator_mode != start_arpeggiator_button:
-        deactivate_arpeggiator(arpeggiator_mode)
+        deactivate_arpeggiator(arpeggiator_event)
 
         # Esperar a que el hilo anterior se detenga completamente
-        if arpeggiator_thread and arpeggiator_thread.is_alive():
-            arpeggiator_thread.join()
+        if arpeggiator_thread:
+            if arpeggiator_thread.is_alive():
+                arpeggiator_event.wait()
+                arpeggiator_thread.join()
+                arpeggiator_event.clear()
 
-    arpeggiator_event = threading.Event()
-    arpeggiator_thread = threading.Thread(
-        target=handle_arpeggiator,
-        args=(
-            window,
-            canvas,
-            triangle_notes,
-            triangle_ids,
-            circle_ids,
-            selected_port_in,
-            selected_port_out,
-            type,
-            tempo,
-            compas,
-            octave,
-        ),
-        daemon=True,
-    )
-    arpeggiator_thread.start()
+    if not arpeggiator_thread:
+        arpeggiator_event = threading.Event()
+        arpeggiator_thread = threading.Thread(
+            target=handle_arpeggiator,
+            args=(
+                window,
+                canvas,
+                triangle_notes,
+                triangle_ids,
+                circle_ids,
+                selected_port_in,
+                selected_port_out,
+                type,
+                tempo,
+                compas,
+                octave,
+            ),
+            daemon=True,
+        )
+        arpeggiator_thread.start()
 
     arpeggiator_mode = start_arpeggiator_button
 
