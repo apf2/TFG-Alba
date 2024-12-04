@@ -114,6 +114,7 @@ previous_notes = []
 up_arpeggiator = False
 arpeggiator_mode = None
 arpeggiator_active = False
+note_times = {}
 
 screen_window = None
 dark_mode = False
@@ -132,10 +133,12 @@ def check_dependences(dependencies):
         return "ok"
     else:
         message = "Missing dependencies: {}\n".format(
-            ", ".join(missing_dependencies))
+            ", ".join(missing_dependencies)
+        )
         message += "To install dependencies, run:\n"
         message += "pip install --user {}\n".format(
-            " ".join(missing_dependencies))
+            " ".join(missing_dependencies)
+        )
         return message
 
 
@@ -203,14 +206,16 @@ def click_circle(c, circle, text, note, selected_port_in, selected_port_out):
     c.tag_bind(
         circle,
         "<Button-1>",
-        lambda event, note=note: play_note(note, selected_port_in,
-                                           selected_port_out),
+        lambda event, note=note: play_note(
+            note, selected_port_in, selected_port_out
+        ),
     )
     c.tag_bind(
         text,
         "<Button-1>",
-        lambda event, note=note: play_note(note, selected_port_in,
-                                           selected_port_out),
+        lambda event, note=note: play_note(
+            note, selected_port_in, selected_port_out
+        ),
     )
 
 
@@ -220,24 +225,28 @@ def unclick_circle(c, circle, text, note, selected_port_in, selected_port_out):
     c.tag_bind(
         circle,
         "<ButtonRelease-1>",
-        lambda event, note=note: stop_note(note, selected_port_in,
-                                           selected_port_out),
+        lambda event, note=note: stop_note(
+            note, selected_port_in, selected_port_out
+        ),
     )
     c.tag_bind(
         text,
         "<ButtonRelease-1>",
-        lambda event, note=note: stop_note(note, selected_port_in,
-                                           selected_port_out),
+        lambda event, note=note: stop_note(
+            note, selected_port_in, selected_port_out
+        ),
     )
 
 
 # Función para manejar los eventos del ratón para los círculos
-def click_circle_events(c, circle, text, note, selected_port_in,
-                        selected_port_out):
+def click_circle_events(
+    c, circle, text, note, selected_port_in, selected_port_out
+):
     try:
         click_circle(c, circle, text, note, selected_port_in, selected_port_out)
-        unclick_circle(c, circle, text, note, selected_port_in,
-                       selected_port_out)
+        unclick_circle(
+            c, circle, text, note, selected_port_in, selected_port_out
+        )
     except OSError as e:
         print("Error al abrir el puerto MIDI:", e)
     return
@@ -274,7 +283,8 @@ def click_triangle_events(
             triangle_id,
             "<ButtonRelease-1>",
             lambda event, coords=triangle_coords: stop_chord(
-                coords, triangle_notes, selected_port_in, selected_port_out),
+                coords, triangle_notes, selected_port_in, selected_port_out
+            ),
         )
     except OSError as e:
         print("Error al abrir el puerto MIDI:", e)
@@ -319,13 +329,15 @@ def handle_click_triangle(
             selected_shape[new_triangle_id] = "triangle"
 
         # Tocamos el acorde nuevo
-        play_chord(triangle_coords, triangle_notes, selected_port_in,
-                   selected_port_out)
+        play_chord(
+            triangle_coords, triangle_notes, selected_port_in, selected_port_out
+        )
 
     else:
         # Marca y reproduce el acorde del nuevo triángulo
-        play_chord(triangle_coords, triangle_notes, selected_port_in,
-                   selected_port_out)
+        play_chord(
+            triangle_coords, triangle_notes, selected_port_in, selected_port_out
+        )
 
 
 # Comprobamos las notas asociadas a los triángulos
@@ -334,8 +346,10 @@ def check_triangle_notes(painted_coords, triangle_notes):
         for triangle_coords, notes_for_triangle in triangle_notes.items():
             for coord in triangle_coords:
                 # Verificamos si alguna de las coordenadas redondeadas está en las coordenadas del triángulo
-                if (round(coord[0], 2) == coords[0]
-                        and round(coord[1], 2) == coords[1]):
+                if (
+                    round(coord[0], 2) == coords[0]
+                    and round(coord[1], 2) == coords[1]
+                ):
                     # Si encontramos una coincidencia añadimos las notas asociadas a ese triángulo
                     note = painted_coords[coords]["note"]
                     # Si esa nota no está en la lista se añade
@@ -408,8 +422,9 @@ def add_notes(
                     "text_id": text,
                 }
                 circle_ids[circle] = {"coords": (x, y), "note": note}
-                click_circle_events(c, circle, text, note, selected_port_in,
-                                    selected_port_out)
+                click_circle_events(
+                    c, circle, text, note, selected_port_in, selected_port_out
+                )
 
                 i += 1
 
@@ -429,8 +444,10 @@ def play_note(note, selected_port_in, selected_port_out):
             if note not in active_notes:
                 active_notes[note] = midi_value
                 # Si no hay puerto midi usamos nuestra función simulada
-                if (selected_port_out == "No hay puertos midi"
-                        or selected_port_in == "No hay puertos midi"):
+                if (
+                    selected_port_out == "No hay puertos midi"
+                    or selected_port_in == "No hay puertos midi"
+                ):
                     send, close = open_output_simulated()
                     send(mido.Message("note_on", note=midi_value))
                 else:
@@ -451,8 +468,10 @@ def stop_note(note, selected_port_in, selected_port_out):
             midi_value = dict_notes[note]
             if note in active_notes:
                 # Si no hay puerto midi mandamos note_off con nuestra función simulada y cerramos
-                if (selected_port_out == "No hay puertos midi"
-                        or selected_port_in == "No hay puertos midi"):
+                if (
+                    selected_port_out == "No hay puertos midi"
+                    or selected_port_in == "No hay puertos midi"
+                ):
                     send, close = open_output_simulated()
                     send(mido.Message("note_off", note=midi_value))
                     close()
@@ -467,8 +486,9 @@ def stop_note(note, selected_port_in, selected_port_out):
 
 
 # Función para tocar un acorde, es decir, las 3 notas asociadas al triángulo
-def play_chord(triangle_coords, triangle_notes, selected_port_in,
-               selected_port_out):
+def play_chord(
+    triangle_coords, triangle_notes, selected_port_in, selected_port_out
+):
     try:
         chord_notes = triangle_notes[tuple(triangle_coords)]
 
@@ -480,8 +500,10 @@ def play_chord(triangle_coords, triangle_notes, selected_port_in,
                     selected_port_in = selected_port_in.get()
                 if hasattr(selected_port_out, "get"):
                     selected_port_out = selected_port_out.get()
-                if (selected_port_out == "No hay puertos midi"
-                        or selected_port_in == "No hay puertos midi"):
+                if (
+                    selected_port_out == "No hay puertos midi"
+                    or selected_port_in == "No hay puertos midi"
+                ):
                     send, close = open_output_simulated()
                     send(mido.Message("note_on", note=midi_value))
                 else:
@@ -493,8 +515,9 @@ def play_chord(triangle_coords, triangle_notes, selected_port_in,
 
 
 # Función para que pare el acorde
-def stop_chord(triangle_coords, triangle_notes, selected_port_in,
-               selected_port_out):
+def stop_chord(
+    triangle_coords, triangle_notes, selected_port_in, selected_port_out
+):
     try:
         chord_notes = triangle_notes[tuple(triangle_coords)]
         for note in chord_notes:
@@ -505,8 +528,10 @@ def stop_chord(triangle_coords, triangle_notes, selected_port_in,
                         selected_port_in = selected_port_in.get()
                     if hasattr(selected_port_out, "get"):
                         selected_port_out = selected_port_out.get()
-                    if (selected_port_out == "No hay puertos midi"
-                            or selected_port_in == "No hay puertos midi"):
+                    if (
+                        selected_port_out == "No hay puertos midi"
+                        or selected_port_in == "No hay puertos midi"
+                    ):
                         send, close = open_output_simulated()
                         send(mido.Message("note_off", note=midi_value))
                         close()
@@ -664,12 +689,18 @@ def triangles(window, c, size_factor, selected_port_in, selected_port_out):
         for col in range(COLUMNS):
             # Definimos las coordenadas x e y
             if row % 2 == 0:
-                x = (col * triangle_side / 2 +
-                     (1 - row % 2) * triangle_side / 2 + 100)
+                x = (
+                    col * triangle_side / 2
+                    + (1 - row % 2) * triangle_side / 2
+                    + 100
+                )
             else:
-                x = (col * triangle_side / 2 +
-                     (1 - row % 2) * triangle_side / 2 + 100 +
-                     triangle_side * 0.5)
+                x = (
+                    col * triangle_side / 2
+                    + (1 - row % 2) * triangle_side / 2
+                    + 100
+                    + triangle_side * 0.5
+                )
             y = row * triangle_height + 200
 
             # Fila par
@@ -707,13 +738,13 @@ def triangles(window, c, size_factor, selected_port_in, selected_port_out):
 
             if dark_mode:
                 # Dibujamos el triángulo
-                triangle_id = c.create_polygon(triangle_coords,
-                                               fill=window.cget("bg"),
-                                               outline="white")
+                triangle_id = c.create_polygon(
+                    triangle_coords, fill=window.cget("bg"), outline="white"
+                )
             else:
-                triangle_id = c.create_polygon(triangle_coords,
-                                               fill=window.cget("bg"),
-                                               outline="black")
+                triangle_id = c.create_polygon(
+                    triangle_coords, fill=window.cget("bg"), outline="black"
+                )
             click_triangle_events(
                 window,
                 c,
@@ -782,12 +813,13 @@ def detect_note_on(
                 # Buscamos el triángulo asociado a la nota y lo marcamos
                 for coords, notes_for_triangle in triangle_notes.items():
                     if musical_note in notes_for_triangle:
-                        if all(note in active_notes
-                               for note in notes_for_triangle):
+                        if all(
+                            note in active_notes for note in notes_for_triangle
+                        ):
                             # Guardamos el triángulo a selected_shape
                             for (
-                                    triangle_id,
-                                    triangle_coords,
+                                triangle_id,
+                                triangle_coords,
                             ) in triangle_ids.items():
                                 if set(triangle_coords) == set(coords):
                                     selected_shape[triangle_id] = "triangle"
@@ -801,12 +833,24 @@ def detect_note_on(
                                 selected_port_in,
                                 selected_port_out,
                             )
+                if selected_port_out != "no-midi":
+                    with mido.open_output(selected_port_out) as port_out:
+                        port_out.send(mido.Message("note_on", note=note_midi))
+                    # Registrar la nueva nota como activa
+                    active_notes[note_midi] = note
     return
 
 
 # Detectamos que la nota se ha apagado
-def detect_note_off(window, canvas, note_midi, triangle_notes, triangle_ids,
-                    circle_ids):
+def detect_note_off(
+    window,
+    canvas,
+    note_midi,
+    triangle_notes,
+    triangle_ids,
+    circle_ids,
+    selected_port_out,
+):
     for note, midi in dict_notes.items():
         # Comprueba si el valor midi coincide
         if midi == note_midi:
@@ -825,21 +869,28 @@ def detect_note_off(window, canvas, note_midi, triangle_notes, triangle_ids,
 
                 for coords, notes_for_triangle in triangle_notes.items():
                     if musical_note in notes_for_triangle:
-                        all_notes_off = all(midi not in active_notes.values()
-                                            for midi in notes_for_triangle)
+                        all_notes_off = all(
+                            midi not in active_notes.values()
+                            for midi in notes_for_triangle
+                        )
                         if all_notes_off:
                             if not navigation_mode:
                                 # Elimina el triángulo de selected_shape
                                 for (
-                                        triangle_id,
-                                        triangle_coords,
+                                    triangle_id,
+                                    triangle_coords,
                                 ) in triangle_ids.items():
                                     if set(triangle_coords) == set(coords):
                                         selected_shape.pop(triangle_id, None)
 
                                 # Si están todas las nptas apagadas desmarcamos el triángulo
-                                unmark_triangles(window, canvas, coords,
-                                                 triangle_ids)
+                                unmark_triangles(
+                                    window, canvas, coords, triangle_ids
+                                )
+                # Enviamos la nota apagada al sintetizador
+                if selected_port_out != "no-midi":
+                    with mido.open_output(selected_port_out) as port_out:
+                        port_out.send(mido.Message("note_off", note=note_midi))
     return
 
 
@@ -901,6 +952,7 @@ def detect_note_without_midi(
                         triangle_notes,
                         triangle_ids,
                         circle_ids,
+                        selected_port_out,
                     )
         except Exception:
             pass
@@ -911,14 +963,17 @@ def detect_note_without_midi(
 # Funcion por si el mensaje es 'note'
 def detect_chord(canvas, note_midi, triangle_notes, triangle_ids):
     current_time = time.time()
-    # Si la nota aún no está en las notas activas la añadimos con su tiempo de activación
-    if note_midi not in active_notes:
-        active_notes[note_midi] = note_midi
 
-    # Limpiar notas que ya no están activas
+    note = midi_to_note_name(note_midi)
+
+    # Si la nota aún no está en las notas activas la añadimos con su tiempo de activación
+    if note not in note_times:
+        note_times[note] = current_time
+    # Limpiar notas cuyo tiempo excede el intervalo de acorde
     chord_notes = [
-        note for note in active_notes
-        if (current_time - active_notes[note]) <= MAX_CHORD_INTERVAL
+        note
+        for note in note_times
+        if (current_time - note_times[note]) <= MAX_CHORD_INTERVAL
     ]
 
     # Si hay exactamente 3 notas activas en ese intervalo de tiempo, consideramos que es un acorde
@@ -965,8 +1020,9 @@ def detect_notes(
                         note_midi = message.note % 12 + C_MIDI
                         # Verifica si el mensaje es una nota activa
                         if message.type == "note_on":
-                            detect_chord(canvas, note_midi, triangle_notes,
-                                         triangle_ids)
+                            detect_chord(
+                                canvas, note_midi, triangle_notes, triangle_ids
+                            )
                             detect_note_on(
                                 window,
                                 canvas,
@@ -988,6 +1044,7 @@ def detect_notes(
                                 triangle_notes,
                                 triangle_ids,
                                 circle_ids,
+                                selected_port_out,
                             )
                     # En caso de que no sea un mensaje tipo note lo ignoramos
                     elif message.type == "aftertouch":
@@ -1004,8 +1061,9 @@ def get_triangle_in_selected_shape(shapes_to_update, triangle_ids, circle_ids):
         for old_id in shape_updates.keys():
             new_coords = shape_updates[old_id][1]
             new_shape_id = None
-            for tid, coords in (triangle_ids if shape_type == "triangle" else
-                                circle_ids).items():
+            for tid, coords in (
+                triangle_ids if shape_type == "triangle" else circle_ids
+            ).items():
                 if tuple(coords) == new_coords:
                     new_shape_id = tid
                     break
@@ -1015,8 +1073,9 @@ def get_triangle_in_selected_shape(shapes_to_update, triangle_ids, circle_ids):
 
 
 # Añadir circle_ids en selected_shape
-def get_circle_in_selected_shape(new_selected_shape, triangle_notes,
-                                 triangle_ids, circle_ids):
+def get_circle_in_selected_shape(
+    new_selected_shape, triangle_notes, triangle_ids, circle_ids
+):
     new_notes_to_check = list(new_selected_shape.keys())
     for triangle_id in new_notes_to_check:
         coords = tuple(triangle_ids[triangle_id])
@@ -1142,7 +1201,8 @@ def mark_all(
 
     # Obtener la nota actual y las anteriores
     current_triangle_id = [
-        triangle_id for triangle_id in selected_shape
+        triangle_id
+        for triangle_id in selected_shape
         if selected_shape[triangle_id] == "triangle"
     ]
     if current_triangle_id:
@@ -1199,14 +1259,18 @@ def handle_key(
                     # Calcula el nuevo id basado en la dirección de la tecla
                     if event.keysym == "Left":
                         new_triangle_id = triangle_id - 1
-                        if (new_triangle_id < 1 or
-                            (new_triangle_id - 1) % COLUMNS == COLUMNS - 1):
+                        if (
+                            new_triangle_id < 1
+                            or (new_triangle_id - 1) % COLUMNS == COLUMNS - 1
+                        ):
                             continue
 
                     elif event.keysym == "Right":
                         new_triangle_id = triangle_id + 1
-                        if (new_triangle_id > COLUMNS * ROWS
-                                or new_triangle_id % COLUMNS == 1):
+                        if (
+                            new_triangle_id > COLUMNS * ROWS
+                            or new_triangle_id % COLUMNS == 1
+                        ):
                             continue
 
                     elif event.keysym == "Up":
@@ -1257,9 +1321,11 @@ def handle_key(
 
             # Actualizar la selección actual
             new_selected_shape = get_triangle_in_selected_shape(
-                shapes_to_update, triangle_ids, circle_ids)
-            get_circle_in_selected_shape(new_selected_shape, triangle_notes,
-                                         triangle_ids, circle_ids)
+                shapes_to_update, triangle_ids, circle_ids
+            )
+            get_circle_in_selected_shape(
+                new_selected_shape, triangle_notes, triangle_ids, circle_ids
+            )
 
             selected_shape = new_selected_shape
 
@@ -1279,8 +1345,9 @@ def handle_key(
                 if selected_shape[triangle_id] == "triangle":
                     triangle_coords = tuple(triangle_ids[triangle_id])
                     # Desmarcar triángulos previamente marcados
-                    unmark_triangles(window, canvas, triangle_notes,
-                                     triangle_ids)
+                    unmark_triangles(
+                        window, canvas, triangle_notes, triangle_ids
+                    )
                     # Marcar el triángulo seleccionado y tocar el acorde
                     mark_triangles(
                         window,
@@ -1384,11 +1451,14 @@ def nav_with_arrow_keys(
 
 
 # Desmarcar círculos no asociados a las notas tocadas
-def unmark_unused_circles(window, canvas, circle_ids, current_notes_set,
-                          previous_notes_set):
+def unmark_unused_circles(
+    window, canvas, circle_ids, current_notes_set, previous_notes_set
+):
     for circle_id, circle_info in circle_ids.items():
-        if (circle_info["note"] not in current_notes_set
-                and circle_info["note"] in previous_notes_set):
+        if (
+            circle_info["note"] not in current_notes_set
+            and circle_info["note"] in previous_notes_set
+        ):
             # Llamar a unmark_notes para desmarcar la nota y el círculo
             unmark_notes(window, canvas, circle_info["note"], circle_ids)
 
@@ -1404,8 +1474,9 @@ def midi_to_note_name(midi_note):
 
 
 # TOcamos las notas del arpegio
-def play_arpeggio_notes(midi_notes, selected_port_in, selected_port_out, tempo,
-                        compas):
+def play_arpeggio_notes(
+    midi_notes, selected_port_in, selected_port_out, tempo, compas
+):
     tempo = tempo.get()
     compas = compas.get()
 
@@ -1507,8 +1578,9 @@ def play_arpeggio(
                 # Orden aleatorio
                 random.shuffle(midi_notes)
 
-            play_arpeggio_notes(midi_notes, selected_port_in, selected_port_out,
-                                tempo, compas)
+            play_arpeggio_notes(
+                midi_notes, selected_port_in, selected_port_out, tempo, compas
+            )
             unmark_unused_circles(
                 window,
                 canvas,
@@ -1795,17 +1867,17 @@ def create_arpeggiator_frame(
     selected_port_out,
 ):
     # Crear el frame del arpegiador
-    arpeggiator_frame = tk.Frame(window,
-                                 bd=2,
-                                 relief=tk.RIDGE,
-                                 bg=window.cget("bg"))
+    arpeggiator_frame = tk.Frame(
+        window, bd=2, relief=tk.RIDGE, bg=window.cget("bg")
+    )
 
     # Llamar a la función de actualización de posición al crear el frame
     update_position(arpeggiator_frame, window)
 
     # Asignar la función de actualización a la configuración de la ventana
-    window.bind("<Configure>",
-                lambda event: update_position(arpeggiator_frame, window))
+    window.bind(
+        "<Configure>", lambda event: update_position(arpeggiator_frame, window)
+    )
 
     if dark_mode:
         # Agregar un título al marco
@@ -1923,20 +1995,22 @@ def button_arpeggiator_up(
     start_arpeggiator_button_up = ttk.Button(
         window,
         image=up_image,
-        command=lambda: (start_arpeggiator(
-            window,
-            canvas,
-            start_arpeggiator_button_up,
-            triangle_notes,
-            triangle_ids,
-            circle_ids,
-            selected_port_in,
-            selected_port_out,
-            "up",
-            tempo,
-            compas,
-            octave,
-        )),
+        command=lambda: (
+            start_arpeggiator(
+                window,
+                canvas,
+                start_arpeggiator_button_up,
+                triangle_notes,
+                triangle_ids,
+                circle_ids,
+                selected_port_in,
+                selected_port_out,
+                "up",
+                tempo,
+                compas,
+                octave,
+            )
+        ),
     )
 
     # Mantiene una referencia a la imagen para evitar que se recoja por el garbage collector
@@ -1964,20 +2038,22 @@ def button_arpeggiator_down(
     start_arpeggiator_button_down = ttk.Button(
         window,
         image=down_image,
-        command=lambda: (start_arpeggiator(
-            window,
-            canvas,
-            start_arpeggiator_button_down,
-            triangle_notes,
-            triangle_ids,
-            circle_ids,
-            selected_port_in,
-            selected_port_out,
-            "down",
-            tempo,
-            compas,
-            octave,
-        )),
+        command=lambda: (
+            start_arpeggiator(
+                window,
+                canvas,
+                start_arpeggiator_button_down,
+                triangle_notes,
+                triangle_ids,
+                circle_ids,
+                selected_port_in,
+                selected_port_out,
+                "down",
+                tempo,
+                compas,
+                octave,
+            )
+        ),
     )
 
     start_arpeggiator_button_down.image = down_image
@@ -2003,20 +2079,22 @@ def button_arpeggiator_random(
     start_arpeggiator_button_random = ttk.Button(
         window,
         image=random_image,
-        command=lambda: (start_arpeggiator(
-            window,
-            canvas,
-            start_arpeggiator_button_random,
-            triangle_notes,
-            triangle_ids,
-            circle_ids,
-            selected_port_in,
-            selected_port_out,
-            "random",
-            tempo,
-            compas,
-            octave,
-        )),
+        command=lambda: (
+            start_arpeggiator(
+                window,
+                canvas,
+                start_arpeggiator_button_random,
+                triangle_notes,
+                triangle_ids,
+                circle_ids,
+                selected_port_in,
+                selected_port_out,
+                "random",
+                tempo,
+                compas,
+                octave,
+            )
+        ),
     )
 
     start_arpeggiator_button_random.image = random_image
@@ -2049,16 +2127,18 @@ def button_nav(
     start_nav_button = ttk.Button(
         window,
         text="Hold on",
-        command=lambda: (nav_with_arrow_keys(
-            window,
-            canvas,
-            start_nav_button,
-            triangle_notes,
-            triangle_ids,
-            circles_ids,
-            selected_port_in,
-            selected_port_out,
-        )),
+        command=lambda: (
+            nav_with_arrow_keys(
+                window,
+                canvas,
+                start_nav_button,
+                triangle_notes,
+                triangle_ids,
+                circles_ids,
+                selected_port_in,
+                selected_port_out,
+            )
+        ),
     )
 
     start_nav_button.pack(side=tk.TOP, pady=10)
@@ -2096,19 +2176,17 @@ def choose_tempo(window):
     tempo.set(60)
 
     # Botones de incremento y decremento
-    decrease_button = ttk.Button(window,
-                                 text="-",
-                                 command=lambda: decrease_tempo(tempo),
-                                 width=2)
+    decrease_button = ttk.Button(
+        window, text="-", command=lambda: decrease_tempo(tempo), width=2
+    )
     decrease_button.pack(side=tk.LEFT)
 
     tempo_entry = ttk.Entry(window, textvariable=tempo, width=5)
     tempo_entry.pack(side=tk.LEFT)
 
-    increase_button = ttk.Button(window,
-                                 text="+",
-                                 command=lambda: increase_tempo(tempo),
-                                 width=2)
+    increase_button = ttk.Button(
+        window, text="+", command=lambda: increase_tempo(tempo), width=2
+    )
     increase_button.pack(side=tk.LEFT)
 
     tempo_entry.bind("<Return>", lambda e: validate_tempo(tempo))
@@ -2153,9 +2231,9 @@ def choose_octave(window):
             fg="white",
         )
     else:
-        label = tk.Label(octave_frame,
-                         text="Extensión por:",
-                         bg=window.cget("bg"))
+        label = tk.Label(
+            octave_frame, text="Extensión por:", bg=window.cget("bg")
+        )
 
     label.pack(side=tk.LEFT)
     octaves = [1, 2, 3]
@@ -2174,10 +2252,9 @@ def choose_octave(window):
     octaves_menu.pack(side=tk.LEFT, padx=5)
 
     if dark_mode:
-        label = tk.Label(octave_frame,
-                         text="octava",
-                         bg=window.cget("bg"),
-                         fg="white")
+        label = tk.Label(
+            octave_frame, text="octava", bg=window.cget("bg"), fg="white"
+        )
     else:
         label = tk.Label(octave_frame, text="octava", bg=window.cget("bg"))
 
@@ -2304,8 +2381,9 @@ def midi_out_port_selection(window):
     return selected_port_out, midi_out_ports
 
 
-def get_midi_ports(window, selected_port_in_from_config,
-                   selected_port_out_from_config):
+def get_midi_ports(
+    window, selected_port_in_from_config, selected_port_out_from_config
+):
     # Seleccionamos el puerto midi de entrada y salida
     selected_port_in, midi_ports_in = midi_in_port_selection(window)
     if selected_port_in_from_config:
@@ -2329,10 +2407,9 @@ def button_size_factor(
     midi_ports_out,
 ):
     # Mostramos el menu de tamaños
-    size_factor_menu = ttk.Combobox(frame,
-                                    textvariable=size_factor,
-                                    values=size_factors,
-                                    state="readonly")
+    size_factor_menu = ttk.Combobox(
+        frame, textvariable=size_factor, values=size_factors, state="readonly"
+    )
     size_factor_menu.pack(padx=5, pady=5)
 
     # Botón para seleccionar el tamaño
@@ -2424,9 +2501,9 @@ def create_scrollbar(window):
 
     # Canvas con el scrollbar
     canvas = tk.Canvas(container, bg=window.cget("bg"))
-    scrollbar = ttk.Scrollbar(container,
-                              orient="vertical",
-                              command=canvas.yview)
+    scrollbar = ttk.Scrollbar(
+        container, orient="vertical", command=canvas.yview
+    )
     scrollable_frame = tk.Frame(canvas, bg=window.cget("bg"))
 
     # Configuramos el scrollbar
@@ -2686,13 +2763,13 @@ def paint_rectangle(circle_coords):
     rectangle_coords = (min_x, min_y, max_x, max_y)
 
     if dark_mode:
-        rectangle = c.create_rectangle(rectangle_coords,
-                                       width=4,
-                                       outline="white")
+        rectangle = c.create_rectangle(
+            rectangle_coords, width=4, outline="white"
+        )
     else:
-        rectangle = c.create_rectangle(rectangle_coords,
-                                       width=4,
-                                       outline="black")
+        rectangle = c.create_rectangle(
+            rectangle_coords, width=4, outline="black"
+        )
 
     c.lower(rectangle)
 
@@ -2741,8 +2818,9 @@ def create_canvas(
             triangle_ids,
             circle_ids,
             circle_coords,
-        ) = triangles(window, c, size_factor, selected_port_in,
-                      selected_port_out)
+        ) = triangles(
+            window, c, size_factor, selected_port_in, selected_port_out
+        )
 
         create_arpeggiator_frame(
             window,
@@ -2816,8 +2894,9 @@ def buttons_desing():
         font=("Arial", 10),
     )
 
-    style.map("TButton",
-              background=[("active", "#0056b3"), ("pressed", "#004085")])
+    style.map(
+        "TButton", background=[("active", "#0056b3"), ("pressed", "#004085")]
+    )
 
 
 def main():
@@ -2849,8 +2928,10 @@ def main():
     window.title("Diagrama de Tonnetz")
 
     selected_port_in, selected_port_out, midi_ports_in, midi_ports_out = (
-        get_midi_ports(window, selected_port_in_from_config,
-                       selected_port_out_from_config))
+        get_midi_ports(
+            window, selected_port_in_from_config, selected_port_out_from_config
+        )
+    )
 
     # Elegimos el factor
     size_factor, size_factors = choose_size_factor(window)
