@@ -997,7 +997,7 @@ def detect_notes(
     try:
         # En caso de que se abra el programa sin puertos midi lo manejaremos con un bucle
         # para ir controlando las notas activas que generamos con open_output_simulated()
-        if selected_port_in == "No hay puertos midi":
+        if selected_port_in == "no-midi":
             detect_note_without_midi(
                 window,
                 canvas,
@@ -1638,8 +1638,20 @@ def handle_arpeggiator(
 
 
 # Función para encender o apagar el arpegiador y habilitar los botones up, sown y random
-def toggle_arpeggiator(arpeggiator_on_button, window):
-    global arpeggiator_active, arpeggiator_event, arpeggiator_thread
+def toggle_arpeggiator(
+    arpeggiator_on_button,
+    window,
+    canvas,
+    triangle_notes,
+    triangle_ids,
+    circle_ids,
+    selected_port_in,
+    selected_port_out,
+    tempo,
+    compas,
+    octave,
+):
+    global arpeggiator_active, arpeggiator_event, arpeggiator_thread, up_arpeggiator
     arpeggiator_active = not arpeggiator_active
 
     up_button = window.up_button
@@ -1649,6 +1661,22 @@ def toggle_arpeggiator(arpeggiator_on_button, window):
     if arpeggiator_active:
         arpeggiator_on_button.config(text="Arpegiador off")
         print("Arpegiador encendido")
+
+        start_arpeggiator(
+            window,
+            canvas,
+            arpeggiator_on_button,
+            triangle_notes,
+            triangle_ids,
+            circle_ids,
+            selected_port_in,
+            selected_port_out,
+            "up",
+            tempo,
+            compas,
+            octave,
+        )
+
         # Habilitar los botones up, down y random
         up_button.state(["!disabled"])
         down_button.state(["!disabled"])
@@ -1912,8 +1940,6 @@ def create_arpeggiator_frame(
     button_frame = tk.Frame(arpeggiator_frame, bg=window.cget("bg"))
     button_frame.pack(pady=5)
 
-    button_arpeggiator(button_frame)
-
     # Creamos un frame para los controles de compás y tempo
     control_frame = tk.Frame(arpeggiator_frame, bg=window.cget("bg"))
     control_frame.pack(pady=5)
@@ -1926,6 +1952,19 @@ def create_arpeggiator_frame(
     tempo = choose_tempo(controls_subframe)
 
     octave = choose_octave(arpeggiator_frame)
+
+    button_arpeggiator(
+        button_frame,
+        canvas,
+        triangle_notes,
+        triangle_ids,
+        circle_ids,
+        selected_port_in,
+        selected_port_out,
+        tempo,
+        compas,
+        octave,
+    )
 
     # Creamos los botones up, down y random
     up_button = button_arpeggiator_up(
@@ -2104,11 +2143,36 @@ def button_arpeggiator_random(
 
 
 # Botón para activar el arpegiador
-def button_arpeggiator(window):
+def button_arpeggiator(
+    window,
+    canvas,
+    triangle_notes,
+    triangle_ids,
+    circle_ids,
+    selected_port_in,
+    selected_port_out,
+    tempo,
+    compas,
+    octave,
+):
     start_arpeggiator_button = ttk.Button(
         window,
         text="Arpegiador on",
-        command=lambda: (toggle_arpeggiator(start_arpeggiator_button, window)),
+        command=lambda: (
+            toggle_arpeggiator(
+                start_arpeggiator_button,
+                window,
+                canvas,
+                triangle_notes,
+                triangle_ids,
+                circle_ids,
+                selected_port_in,
+                selected_port_out,
+                tempo,
+                compas,
+                octave,
+            )
+        ),
     )
 
     start_arpeggiator_button.pack(side=tk.LEFT, pady=10)
