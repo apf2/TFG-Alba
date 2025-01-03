@@ -1,5 +1,5 @@
 Alba Payo Fernández
 
-Esta obra está bajo una licencia Creative Commons
-“Atribución-CompartirIgual 4.0 Internacional”.
-https://creativecommons.org/licenses/by-sa/4.0/deed.es
+Esta obra está bajo la Licencia Pública General (GPL)
+“GNU General Public License”.
+https://www.gnu.org/licenses/gpl-3.0.html
