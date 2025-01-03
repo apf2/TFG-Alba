@@ -1382,7 +1382,7 @@ def nav_with_arrow_keys(
     print(navigation_mode)
 
     if navigation_mode:
-        start_nav_button.config(text="Hold off")
+        start_nav_button.config(text="Hold on")
         window.focus_set()
         window.bind(
             "<Up>",
@@ -1442,7 +1442,7 @@ def nav_with_arrow_keys(
         for note in list(active_notes.keys()):
             stop_note(note, selected_port_in, selected_port_out)
 
-        start_nav_button.config(text="Hold on")
+        start_nav_button.config(text="Hold off")
         # Desvincular los eventos de teclado
         window.unbind("<Up>")
         window.unbind("<Down>")
@@ -1490,6 +1490,8 @@ def play_arpeggio_notes(
 
     time_between_notes = time_per_beat * (beats_per_measure / note_value)
 
+    start_time = time.time()
+
     for midi_note in midi_notes:
         note_name = midi_to_note_name(midi_note)
         stop_note(note_name, selected_port_in, selected_port_out)
@@ -1497,9 +1499,12 @@ def play_arpeggio_notes(
 
         play_note(note_name, selected_port_in, selected_port_out)
         # Esperamos un tiempo entre notas calculado con el tempo y el compás
-        time.sleep(time_between_notes)
+        next_note_time = start_time + time_between_notes
+        while time.time() < next_note_time:
+            time.sleep(0.001)
         # Detenemos la nota
         stop_note(note_name, selected_port_in, selected_port_out)
+        start_time = next_note_time
 
 
 # Convertir las notas a valores midi
@@ -1659,7 +1664,7 @@ def toggle_arpeggiator(
     random_button = window.random_button
 
     if arpeggiator_active:
-        arpeggiator_on_button.config(text="Arpegiador off")
+        arpeggiator_on_button.config(text="Arpegiador on")
         print("Arpegiador encendido")
 
         start_arpeggiator(
@@ -1682,7 +1687,7 @@ def toggle_arpeggiator(
         down_button.state(["!disabled"])
         random_button.state(["!disabled"])
     else:
-        arpeggiator_on_button.config(text="Arpegiador on")
+        arpeggiator_on_button.config(text="Arpegiador off")
         print("Arpegiador apagado")
         # Deshabilitar los botones up, down y random
         up_button.state(["disabled"])
@@ -2157,7 +2162,7 @@ def button_arpeggiator(
 ):
     start_arpeggiator_button = ttk.Button(
         window,
-        text="Arpegiador on",
+        text="Arpegiador off",
         command=lambda: (
             toggle_arpeggiator(
                 start_arpeggiator_button,
@@ -2190,7 +2195,7 @@ def button_nav(
 ):
     start_nav_button = ttk.Button(
         window,
-        text="Hold on",
+        text="Hold off",
         command=lambda: (
             nav_with_arrow_keys(
                 window,
@@ -2237,7 +2242,7 @@ def choose_tempo(window):
     tempo_frame.pack(side=tk.LEFT, padx=5)
 
     tempo = tk.IntVar(window)
-    tempo.set(60)
+    tempo.set(120)
 
     # Botones de incremento y decremento
     decrease_button = ttk.Button(
