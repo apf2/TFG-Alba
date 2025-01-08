@@ -436,6 +436,8 @@ def add_notes(
 
 # Genera la nota que hemos clicado
 def play_note(note, selected_port_in, selected_port_out):
+    global active_notes
+
     selected_port_in = selected_port_in.get()
     selected_port_out = selected_port_out.get()
     try:
@@ -495,7 +497,8 @@ def play_chord(
         for note in chord_notes:
             if note in dict_notes:
                 midi_value = dict_notes[note]
-                active_notes[note] = midi_value
+                if note not in active_notes:
+                    active_notes[note] = midi_value
                 if hasattr(selected_port_in, "get"):
                     selected_port_in = selected_port_in.get()
                 if hasattr(selected_port_out, "get"):
@@ -559,6 +562,7 @@ def unmark_shapes(window, canvas):
 
         # Limpiar la selección después de desmarcar todas las formas
         selected_shape.clear()
+        active_notes.clear()
 
 
 # Marca la nota si ha sido detectada por midi
@@ -607,8 +611,6 @@ def get_prev_and_new_notes(
     canvas,
     id_to_notes,
     triangle_id,
-    selected_port_in,
-    selected_port_out,
 ):
     # Obtener la nota actual del triángulo
     if triangle_id in id_to_notes:
@@ -632,8 +634,6 @@ def mark_triangles(
     triangle_coords,
     triangle_ids,
     triangle_notes,
-    selected_port_in,
-    selected_port_out,
 ):
     global selected_shape, previous_notes
 
@@ -650,8 +650,6 @@ def mark_triangles(
                         canvas,
                         id_to_notes,
                         triangle_id,
-                        selected_port_in,
-                        selected_port_out,
                     )
 
                 # Cambiar el color del triángulo
@@ -830,14 +828,13 @@ def detect_note_on(
                                 coords,
                                 triangle_ids,
                                 triangle_notes,
-                                selected_port_in,
-                                selected_port_out,
                             )
                 if selected_port_out != "no-midi":
                     with mido.open_output(selected_port_out) as port_out:
                         port_out.send(mido.Message("note_on", note=note_midi))
                     # Registrar la nueva nota como activa
-                    active_notes[note_midi] = note
+                    if note not in active_notes:
+                        active_notes[note_midi] = note
     return
 
 
@@ -994,6 +991,7 @@ def detect_notes(
     triangle_ids,
     circle_ids,
 ):
+    global active_notes
     try:
         # En caso de que se abra el programa sin puertos midi lo manejaremos con un bucle
         # para ir controlando las notas activas que generamos con open_output_simulated()
@@ -1052,6 +1050,46 @@ def detect_notes(
     except OSError as e:
         print("Error al abrir el puerto MIDI:", e)
     return
+
+
+def monitor_active_notes(
+    window,
+    canvas,
+    triangle_notes,
+    triangle_ids,
+    circle_ids,
+    selected_port_in,
+    selected_port_out,
+):
+
+    while not stop_event.is_set():
+        if active_notes == {}:
+            unmark_shapes(window, canvas)
+        for midi_note in dict_notes.values():
+            # Verifica si la nota está activa
+            if midi_note in list(active_notes.values()):
+                detect_note_on(
+                    window,
+                    canvas,
+                    midi_note,
+                    triangle_notes,
+                    triangle_ids,
+                    circle_ids,
+                    selected_port_in,
+                    selected_port_out,
+                )
+            else:
+                detect_note_off(
+                    window,
+                    canvas,
+                    midi_note,
+                    triangle_notes,
+                    triangle_ids,
+                    circle_ids,
+                    selected_port_out,
+                )
+
+        time.sleep(0.1)
 
 
 # Añadir los nuevos triángulos en selected_shape
@@ -1122,8 +1160,6 @@ def move_triangles(
                 new_coords,
                 triangle_ids,
                 triangle_notes,
-                selected_port_in,
-                selected_port_out,
             )
             unmark_triangles(window, canvas, old_coords, triangle_ids)
 
@@ -1208,12 +1244,7 @@ def mark_all(
     if current_triangle_id:
         id_to_notes = relate_id_note(triangle_notes, triangle_ids)
         get_prev_and_new_notes(
-            window,
-            canvas,
-            id_to_notes,
-            current_triangle_id[0],
-            selected_port_in,
-            selected_port_out,
+            window, canvas, id_to_notes, current_triangle_id[0]
         )
 
     # Desmarcar triángulos no deseados
@@ -1355,8 +1386,6 @@ def handle_key(
                         triangle_coords,
                         triangle_ids,
                         triangle_notes,
-                        selected_port_in,
-                        selected_port_out,
                     )
                     play_chord(
                         triangle_coords,
@@ -1784,6 +1813,7 @@ def start_detect_note_without_midi(
         daemon=True,
     )
     detect_note_thread.start()
+    return
 
 
 # Hilo de ejecución para la detección de notas
@@ -1796,7 +1826,7 @@ def start_thread(
     triangle_ids,
     circle_ids,
 ):
-    global detect_note_thread, stop_event
+    global detect_note_thread, stop_event, monitor_notes_thread
     stop_event = None
     """Vamos a crear un hilo para que la ejecución de la detección de notas esté
     en paralelo a la ventana con la imagen Ponemos daemon=True para que se
@@ -1817,6 +1847,22 @@ def start_thread(
         stop_event.set()
     elif not stop_event:
         stop_event = threading.Event()
+
+    # Hilo para el monitoreo de active_notes
+    monitor_notes_thread = threading.Thread(
+        target=monitor_active_notes,
+        args=(
+            window,
+            canvas,
+            triangle_notes,
+            triangle_ids,
+            circle_ids,
+            selected_port_in,
+            selected_port_out,
+        ),
+        daemon=True,
+    )
+    monitor_notes_thread.start()
 
     if selected_port_out == "no-midi":
         stop_event = start_detect_note_without_midi(
@@ -2340,7 +2386,6 @@ def button_select_midi_in(
     selected_port_in,
     selected_port_out,
     midi_ports_in,
-    painted_coords,
     triangle_notes,
     triangle_ids,
     circle_ids,
@@ -2705,7 +2750,6 @@ def audio_settings(
         selected_port_in,
         selected_port_out,
         midi_ports_in,
-        painted_coords,
         triangle_notes,
         triangle_ids,
         circle_ids,
