@@ -111,10 +111,13 @@ active_notes = {}
 navigation_mode = False
 selected_shape = {}
 previous_notes = []
-up_arpeggiator = False
+up_arpeggiator = "up"
 arpeggiator_mode = None
 arpeggiator_active = False
 note_times = {}
+
+navigation_thread_active = threading.Event()
+arpeggiator_thread_active = threading.Event()
 
 screen_window = None
 dark_mode = False
@@ -481,7 +484,7 @@ def stop_note(note, selected_port_in, selected_port_out):
                     # Si hay puerto midi simulamos la nota
                     with mido.open_output(selected_port_out) as port:
                         port.send(mido.Message("note_off", note=midi_value))
-                del active_notes[note]
+                active_notes.pop(note, None)
     except OSError as e:
         print("Error al abrir el puerto MIDI:", e)
     return
@@ -541,7 +544,7 @@ def stop_chord(
                     else:
                         with mido.open_output(selected_port_out) as port:
                             port.send(mido.Message("note_off", note=midi_value))
-                    del active_notes[note]
+                    active_notes.pop(note, None)
     except OSError as e:
         print("Error al abrir el puerto MIDI:", e)
     return
@@ -558,7 +561,7 @@ def unmark_shapes(window, canvas):
         for shape_id in shape_ids:
             # Cambiar el color de todas las formas seleccionadas a blanco
             canvas.itemconfig(shape_id, fill=window.cget("bg"))
-            del selected_shape[shape_id]
+            selected_shape.pop(shape_id, None)
 
         # Limpiar la selección después de desmarcar todas las formas
         selected_shape.clear()
@@ -789,10 +792,9 @@ def detect_note_on(
     triangle_notes,
     triangle_ids,
     circle_ids,
-    selected_port_in,
     selected_port_out,
 ):
-    global selected_shape
+    global selected_shape, active_notes
 
     for note, midi in dict_notes.items():
         # Comprueba si el valor midi coincide
@@ -829,12 +831,19 @@ def detect_note_on(
                                 triangle_ids,
                                 triangle_notes,
                             )
-                if selected_port_out != "no-midi":
-                    with mido.open_output(selected_port_out) as port_out:
-                        port_out.send(mido.Message("note_on", note=note_midi))
-                    # Registrar la nueva nota como activa
-                    if note not in active_notes:
-                        active_notes[note_midi] = note
+                try:
+                    if selected_port_out != "no-midi":
+                        with mido.open_output(selected_port_out) as port_out:
+                            port_out.send(
+                                mido.Message("note_on", note=note_midi)
+                            )
+                        # Registrar la nueva nota como activa
+                        if note not in active_notes:
+                            active_notes[note_midi] = note
+                except OSError as e:
+                    print(f"Error al abrir el puerto MIDI: {e}")
+                except Exception as e:
+                    print(f"Ocurrió un error inesperado: {e}")
     return
 
 
@@ -885,9 +894,16 @@ def detect_note_off(
                                     window, canvas, coords, triangle_ids
                                 )
                 # Enviamos la nota apagada al sintetizador
-                if selected_port_out != "no-midi":
-                    with mido.open_output(selected_port_out) as port_out:
-                        port_out.send(mido.Message("note_off", note=note_midi))
+                try:
+                    if selected_port_out != "no-midi":
+                        with mido.open_output(selected_port_out) as port_out:
+                            port_out.send(
+                                mido.Message("note_off", note=note_midi)
+                            )
+                except OSError as e:
+                    print(f"Error al abrir el puerto MIDI: {e}")
+                except Exception as e:
+                    print(f"Ocurrió un error inesperado: {e}")
     return
 
 
@@ -922,9 +938,10 @@ def detect_note_without_midi(
     triangle_ids,
     circle_ids,
     stop_event,
-    selected_port_in,
     selected_port_out,
 ):
+    global active_notes
+
     print("Detectando notas")
     while not stop_event.is_set():
         try:
@@ -938,7 +955,6 @@ def detect_note_without_midi(
                         triangle_notes,
                         triangle_ids,
                         circle_ids,
-                        selected_port_in,
                         selected_port_out,
                     )
                 else:
@@ -954,7 +970,7 @@ def detect_note_without_midi(
         except Exception:
             pass
         # Añado tiempo entre iteración para que no consuma mucha CPU
-        time.sleep(0.1)
+        time.sleep(0.01)
 
 
 # Funcion por si el mensaje es 'note'
@@ -1003,7 +1019,6 @@ def detect_notes(
                 triangle_ids,
                 circle_ids,
                 stop_event,
-                selected_port_in,
                 selected_port_out,
             )
         else:
@@ -1028,7 +1043,6 @@ def detect_notes(
                                 triangle_notes,
                                 triangle_ids,
                                 circle_ids,
-                                selected_port_in,
                                 selected_port_out,
                             )
                         # Verifica si la nota ya no está activa
@@ -1058,11 +1072,10 @@ def monitor_active_notes(
     triangle_notes,
     triangle_ids,
     circle_ids,
-    selected_port_in,
     selected_port_out,
 ):
 
-    while not stop_event.is_set():
+    while stop_event is not None and not stop_event.is_set():
         if active_notes == {}:
             unmark_shapes(window, canvas)
         for midi_note in dict_notes.values():
@@ -1075,7 +1088,6 @@ def monitor_active_notes(
                     triangle_notes,
                     triangle_ids,
                     circle_ids,
-                    selected_port_in,
                     selected_port_out,
                 )
             else:
@@ -1089,7 +1101,7 @@ def monitor_active_notes(
                     selected_port_out,
                 )
 
-        time.sleep(0.1)
+        time.sleep(0.01)
 
 
 # Añadir los nuevos triángulos en selected_shape
@@ -1133,8 +1145,6 @@ def move_triangles(
     triangle_notes,
     triangle_ids,
     circle_ids,
-    selected_port_in,
-    selected_port_out,
 ):
     for old_coords, new_coords in shapes_to_update["triangle"].values():
         if old_coords != new_coords:
@@ -1257,6 +1267,22 @@ def mark_all(
             unmark_triangles(window, canvas, coords_tuple, triangle_ids)
 
 
+# Función para detener los acordes anteriores
+def stop_chord_of_selected_triangles(
+    selected_port_in, selected_port_out, triangle_notes, triangle_ids
+):
+    # Antes de mover el triángulo, detener el acorde actual
+    for triangle_id in selected_shape:
+        if selected_shape[triangle_id] == "triangle":
+            triangle_coords = tuple(triangle_ids[triangle_id])
+            stop_chord(
+                triangle_coords,
+                triangle_notes,
+                selected_port_in,
+                selected_port_out,
+            )
+
+
 # Manejamos el movimiento en modo navegación
 def handle_key(
     window,
@@ -1327,16 +1353,12 @@ def handle_key(
                         valid_move,
                     )
 
-                    # Antes de mover el triángulo, detener el acorde actual
-                    for triangle_id in selected_shape:
-                        if selected_shape[triangle_id] == "triangle":
-                            triangle_coords = tuple(triangle_ids[triangle_id])
-                            stop_chord(
-                                triangle_coords,
-                                triangle_notes,
-                                selected_port_in,
-                                selected_port_out,
-                            )
+                    stop_chord_of_selected_triangles(
+                        selected_port_in,
+                        selected_port_out,
+                        triangle_notes,
+                        triangle_ids,
+                    )
 
         if valid_move:
             move_triangles(
@@ -1346,8 +1368,6 @@ def handle_key(
                 triangle_notes,
                 triangle_ids,
                 circle_ids,
-                selected_port_in,
-                selected_port_out,
             )
 
             # Actualizar la selección actual
@@ -1406,77 +1426,151 @@ def nav_with_arrow_keys(
     selected_port_in,
     selected_port_out,
 ):
-    global navigation_mode
-    navigation_mode = not navigation_mode
+    global navigation_mode, navigation_thread_active
+
     print(navigation_mode)
+
+    while True:
+        if navigation_mode:
+            start_nav_button.config(text="Hold on")
+            window.focus_set()
+
+            window.bind(
+                "<Up>",
+                lambda event: handle_key(
+                    window,
+                    event,
+                    canvas,
+                    triangle_notes,
+                    triangle_ids,
+                    circle_ids,
+                    selected_port_in,
+                    selected_port_out,
+                ),
+            )
+            window.bind(
+                "<Down>",
+                lambda event: handle_key(
+                    window,
+                    event,
+                    canvas,
+                    triangle_notes,
+                    triangle_ids,
+                    circle_ids,
+                    selected_port_in,
+                    selected_port_out,
+                ),
+            )
+            window.bind(
+                "<Left>",
+                lambda event: handle_key(
+                    window,
+                    event,
+                    canvas,
+                    triangle_notes,
+                    triangle_ids,
+                    circle_ids,
+                    selected_port_in,
+                    selected_port_out,
+                ),
+            )
+            window.bind(
+                "<Right>",
+                lambda event: handle_key(
+                    window,
+                    event,
+                    canvas,
+                    triangle_notes,
+                    triangle_ids,
+                    circle_ids,
+                    selected_port_in,
+                    selected_port_out,
+                ),
+            )
+            navigation_thread_active.set()
+        else:
+            unmark_shapes(window, canvas)
+            for note in list(active_notes.keys()):
+                stop_note(note, selected_port_in, selected_port_out)
+
+            start_nav_button.config(text="Hold off")
+            # Desvincular los eventos de teclado
+            window.unbind("<Up>")
+            window.unbind("<Down>")
+            window.unbind("<Left>")
+            window.unbind("<Right>")
+
+            navigation_thread_active.clear()
+            break
+
+        time.sleep(0.01)
+
+
+# Función para alternar el modo de navegación
+def toggle_navigation_mode(
+    window,
+    canvas,
+    start_nav_button,
+    triangle_notes,
+    triangle_ids,
+    circles_ids,
+    selected_port_in,
+    selected_port_out,
+):
+    global navigation_mode
+
+    navigation_mode = not navigation_mode
 
     if navigation_mode:
         start_nav_button.config(text="Hold on")
         window.focus_set()
-        window.bind(
-            "<Up>",
-            lambda event: handle_key(
-                window,
-                event,
-                canvas,
-                triangle_notes,
-                triangle_ids,
-                circle_ids,
-                selected_port_in,
-                selected_port_out,
-            ),
-        )
-        window.bind(
-            "<Down>",
-            lambda event: handle_key(
-                window,
-                event,
-                canvas,
-                triangle_notes,
-                triangle_ids,
-                circle_ids,
-                selected_port_in,
-                selected_port_out,
-            ),
-        )
-        window.bind(
-            "<Left>",
-            lambda event: handle_key(
-                window,
-                event,
-                canvas,
-                triangle_notes,
-                triangle_ids,
-                circle_ids,
-                selected_port_in,
-                selected_port_out,
-            ),
-        )
-        window.bind(
-            "<Right>",
-            lambda event: handle_key(
-                window,
-                event,
-                canvas,
-                triangle_notes,
-                triangle_ids,
-                circle_ids,
-                selected_port_in,
-                selected_port_out,
-            ),
-        )
 
+        # Iniciamos el hilo para el modo de navegación
+        start_nav_thread(
+            window,
+            canvas,
+            start_nav_button,
+            triangle_notes,
+            triangle_ids,
+            circles_ids,
+            selected_port_in,
+            selected_port_out,
+        )
     else:
-        unmark_shapes(window, canvas)
-        for note in list(active_notes.keys()):
-            stop_note(note, selected_port_in, selected_port_out)
-
         start_nav_button.config(text="Hold off")
-        # Desvincular los eventos de teclado
-        window.unbind("<Up>")
-        window.unbind("<Down>")
-        window.unbind("<Left>")
-        window.unbind("<Right>")
+
+    # Navigation_thread_active se encargará de controlar la activación y desactivación del hilo
+    if not navigation_mode:
+        # Cuando el modo de navegación se apaga, se asegura de que el hilo de navegación también se desactiva
+        navigation_thread_active.clear()
+
+
+# Función que inicia el hilo de navegación
+def start_nav_thread(
+    window,
+    canvas,
+    start_nav_button,
+    triangle_notes,
+    triangle_ids,
+    circle_ids,
+    selected_port_in,
+    selected_port_out,
+):
+    nav_thread = threading.Thread(
+        target=nav_with_arrow_keys,
+        args=(
+            window,
+            canvas,
+            start_nav_button,
+            triangle_notes,
+            triangle_ids,
+            circle_ids,
+            selected_port_in,
+            selected_port_out,
+        ),
+        daemon=True,
+    )
+    nav_thread.start()
 
 
 # Desmarcar círculos no asociados a las notas tocadas
@@ -1502,7 +1596,7 @@ def midi_to_note_name(midi_note):
     return None
 
 
-# TOcamos las notas del arpegio
+# Tocamos las notas del arpegio
 def play_arpeggio_notes(
     midi_notes, selected_port_in, selected_port_out, tempo, compas
 ):
@@ -1530,7 +1624,7 @@ def play_arpeggio_notes(
         # Esperamos un tiempo entre notas calculado con el tempo y el compás
         next_note_time = start_time + time_between_notes
         while time.time() < next_note_time:
-            time.sleep(0.001)
+            time.sleep(0.01)
         # Detenemos la nota
         stop_note(note_name, selected_port_in, selected_port_out)
         start_time = next_note_time
@@ -1578,7 +1672,13 @@ def play_arpeggio(
     global up_arpeggiator, arpeggiator_active
     previous_notes_set = set()
 
-    while arpeggiator_active and up_arpeggiator:
+    while arpeggiator_active:
+        if up_arpeggiator != type:
+            # Si el tipo de arpegiador cambia, salimos del ciclo para reiniciar el hilo
+            break
+
+        window.update()
+
         for note in list(active_notes):
             stop_note(note, selected_port_in, selected_port_out)
         current_shape = selected_shape.copy()
@@ -1627,7 +1727,7 @@ def play_arpeggio(
         previous_notes_set = current_notes_set
 
         # Añado tiempo entre iteración para que no consuma mucha CPU
-        time.sleep(0.1)
+        time.sleep(0.01)
 
 
 # Manejo del arpegiador dinámico
@@ -1645,7 +1745,6 @@ def handle_arpeggiator(
     octave,
 ):
     global up_arpeggiator
-    up_arpeggiator = not up_arpeggiator
 
     try:
         if up_arpeggiator:
@@ -1715,21 +1814,20 @@ def toggle_arpeggiator(
         up_button.state(["!disabled"])
         down_button.state(["!disabled"])
         random_button.state(["!disabled"])
+
+        arpeggiator_thread_active.set()
     else:
         arpeggiator_on_button.config(text="Arpegiador off")
         print("Arpegiador apagado")
+        arpeggiator_active = False
+        up_arpeggiator = None
+        arpeggiator_event.set()
         # Deshabilitar los botones up, down y random
         up_button.state(["disabled"])
         down_button.state(["disabled"])
         random_button.state(["disabled"])
 
-
-# Función para desactivar un arpegiador
-def deactivate_arpeggiator(arpeggiator_event):
-    global up_arpeggiator
-
-    print("Cambio de modo de arpegiador")
-    arpeggiator_event.set()
+        arpeggiator_thread_active.clear()
 
 
 # Función para iniciaar el hilo del arpegiador
@@ -1750,16 +1848,12 @@ def start_arpeggiator(
     global arpeggiator_event, arpeggiator_mode, arpeggiator_thread, up_arpeggiator
     arpeggiator_thread = None
 
-    # Si ya hay un arpegiador activo lo desactivamos
-    if arpeggiator_mode and arpeggiator_mode != start_arpeggiator_button:
-        deactivate_arpeggiator(arpeggiator_event)
-
-        # Esperar a que el hilo anterior se detenga completamente
-        if arpeggiator_thread:
-            if arpeggiator_thread.is_alive():
-                arpeggiator_event.wait()
-                arpeggiator_thread.join()
-                arpeggiator_event.clear()
+    if up_arpeggiator != type:
+        up_arpeggiator = type
+        if arpeggiator_thread and arpeggiator_thread.is_alive():
+            arpeggiator_event.set()
+            arpeggiator_thread.join()
+            arpeggiator_thread = None
 
     if not arpeggiator_thread:
         arpeggiator_event = threading.Event()
@@ -1792,7 +1886,6 @@ def start_detect_note_without_midi(
     triangle_notes,
     triangle_ids,
     circle_ids,
-    selected_port_in,
     selected_port_out,
 ):
     global stop_event
@@ -1807,7 +1900,6 @@ def start_detect_note_without_midi(
             triangle_ids,
             circle_ids,
             stop_event,
-            selected_port_in,
             selected_port_out,
         ),
         daemon=True,
@@ -1857,7 +1949,6 @@ def start_thread(
             triangle_notes,
             triangle_ids,
             circle_ids,
-            selected_port_in,
             selected_port_out,
         ),
         daemon=True,
@@ -1871,7 +1962,6 @@ def start_thread(
             triangle_notes,
             triangle_ids,
             circle_ids,
-            selected_port_in,
             selected_port_out,
         )
     else:
@@ -2243,7 +2333,7 @@ def button_nav(
         window,
         text="Hold off",
         command=lambda: (
-            nav_with_arrow_keys(
+            toggle_navigation_mode(
                 window,
                 canvas,
                 start_nav_button,
@@ -2397,7 +2487,7 @@ def button_select_midi_in(
         state="readonly",
     )
     port_menu.pack(padx=5, pady=5)
-    # Boóon para seleccionar el puerto elegido
+    # Botón para seleccionar el puerto elegido
     # Ponemos lambda para que nos permita pasar la función con el argumento
     select_midi_button = ttk.Button(
         frame,
@@ -3023,7 +3113,7 @@ def main():
         "tkinter",
         "rtmidi",
         "time",
-        "PyYAML",
+        "yaml",
     ]
     print(check_dependences(dependencies))
 
