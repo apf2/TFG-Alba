@@ -209,14 +209,14 @@ def click_circle(c, circle, text, note, selected_port_in, selected_port_out):
     c.tag_bind(
         circle,
         "<Button-1>",
-        lambda event, note=note: play_note(
+        lambda event, note_value=note: play_note(
             note, selected_port_in, selected_port_out
         ),
     )
     c.tag_bind(
         text,
         "<Button-1>",
-        lambda event, note=note: play_note(
+        lambda event, note_value=note: play_note(
             note, selected_port_in, selected_port_out
         ),
     )
@@ -228,14 +228,14 @@ def unclick_circle(c, circle, text, note, selected_port_in, selected_port_out):
     c.tag_bind(
         circle,
         "<ButtonRelease-1>",
-        lambda event, note=note: stop_note(
+        lambda event, note_value=note: stop_note(
             note, selected_port_in, selected_port_out
         ),
     )
     c.tag_bind(
         text,
         "<ButtonRelease-1>",
-        lambda event, note=note: stop_note(
+        lambda event, note_value=note: stop_note(
             note, selected_port_in, selected_port_out
         ),
     )
@@ -305,42 +305,35 @@ def handle_click_triangle(
 ):
     global selected_shape
 
-    if navigation_mode:
-        # Detenemos los acordes que estén sonando
-        for triangle_id in list(selected_shape.keys()):
-            if selected_shape[triangle_id] == "triangle":
-                triangle_coords_to_stop = tuple(triangle_ids[triangle_id])
-                stop_chord(
-                    triangle_coords_to_stop,
-                    triangle_notes,
-                    selected_port_in,
-                    selected_port_out,
-                )
+    # Detenemos los acordes que estén sonando
+    for triangle_id in list(selected_shape.keys()):
+        if selected_shape[triangle_id] == "triangle":
+            triangle_coords_to_stop = tuple(triangle_ids[triangle_id])
+            stop_chord(
+                triangle_coords_to_stop,
+                triangle_notes,
+                selected_port_in,
+                selected_port_out,
+            )
 
-        # Desmarcamos las formas y limpiamos la lista de selected_shape
-        unmark_shapes(window, canvas)
-        selected_shape.clear()
+    # Desmarcamos las formas y limpiamos la lista de selected_shape
+    unmark_shapes(window, canvas)
+    selected_shape.clear()
 
-        # Actualizamos selected_shape con los nuevos triángulos
-        new_triangle_id = None
-        for tid, coords in triangle_ids.items():
-            if tuple(coords) == triangle_coords:
-                new_triangle_id = tid
-                break
+    # Actualizamos selected_shape con los nuevos triángulos
+    new_triangle_id = None
+    for tid, coords in triangle_ids.items():
+        if tuple(coords) == triangle_coords:
+            new_triangle_id = tid
+            break
 
-        if new_triangle_id:
-            selected_shape[new_triangle_id] = "triangle"
+    if new_triangle_id:
+        selected_shape[new_triangle_id] = "triangle"
 
-        # Tocamos el acorde nuevo
-        play_chord(
-            triangle_coords, triangle_notes, selected_port_in, selected_port_out
-        )
-
-    else:
-        # Marca y reproduce el acorde del nuevo triángulo
-        play_chord(
-            triangle_coords, triangle_notes, selected_port_in, selected_port_out
-        )
+    # Tocamos el acorde nuevo
+    play_chord(
+        triangle_coords, triangle_notes, selected_port_in, selected_port_out
+    )
 
 
 # Comprobamos las notas asociadas a los triángulos
@@ -908,25 +901,16 @@ def detect_note_off(
 
 
 # Pinta los triángulos cuando se produce un acorde
-def paint_triangles(canvas, chord_notes, triangle_notes, triangle_ids):
+def paint_triangles_in_chord(window, canvas, chord_notes, triangle_notes, triangle_ids):
     # Lista para almacenar las coordenadas de los triángulos que contienen las notas del acorde
     triangles_to_paint = []
 
-    chord_notes_names = [
-        note for note, _ in dict_notes.items() if _ in chord_notes
-    ]
-
     for coords, notes in triangle_notes.items():
-        if all(note in notes for note in chord_notes_names):
+        if all(note in notes for note in chord_notes):
             triangles_to_paint.append(coords)
 
     for coords in triangles_to_paint:
-        # Obtener el ID del triángulo según sus coordenadas
-        for triangle_id, triangle_coords in triangle_ids.items():
-            if list(triangle_coords) == list(coords):
-                # Pintar el triángulo
-                if canvas.winfo_exists():
-                    canvas.itemconfig(triangle_id, fill="#7699d4")
+        mark_triangles(window, canvas, coords, triangle_ids, triangle_notes)
     return
 
 
@@ -974,25 +958,25 @@ def detect_note_without_midi(
 
 
 # Funcion por si el mensaje es 'note'
-def detect_chord(canvas, note_midi, triangle_notes, triangle_ids):
+def detect_chord(window, canvas, note_midi, triangle_notes, triangle_ids):
     current_time = time.time()
-
     note = midi_to_note_name(note_midi)
 
     # Si la nota aún no está en las notas activas la añadimos con su tiempo de activación
     if note not in note_times:
         note_times[note] = current_time
-    # Limpiar notas cuyo tiempo excede el intervalo de acorde
-    chord_notes = [
-        note
-        for note in note_times
-        if (current_time - note_times[note]) <= MAX_CHORD_INTERVAL
-    ]
+
+    chord_notes = []
+    for note in list(note_times):
+        if current_time - note_times[note] <= MAX_CHORD_INTERVAL:
+            chord_notes.append(note)
+        else:
+            note_times.pop(note, None)
 
     # Si hay exactamente 3 notas activas en ese intervalo de tiempo, consideramos que es un acorde
     if len(chord_notes) == 3:
         # Pintamos los triángulos asociados al acorde
-        paint_triangles(canvas, chord_notes, triangle_notes, triangle_ids)
+        paint_triangles_in_chord(window, canvas, chord_notes, triangle_notes, triangle_ids)
 
     return chord_notes
 
@@ -1034,7 +1018,7 @@ def detect_notes(
                         # Verifica si el mensaje es una nota activa
                         if message.type == "note_on":
                             detect_chord(
-                                canvas, note_midi, triangle_notes, triangle_ids
+                                window, canvas, note_midi, triangle_notes, triangle_ids
                             )
                             detect_note_on(
                                 window,
@@ -1613,7 +1597,7 @@ def play_arpeggio_notes(
 
     time_between_notes = time_per_beat * (beats_per_measure / note_value)
 
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     for midi_note in midi_notes:
         note_name = midi_to_note_name(midi_note)
@@ -1623,8 +1607,12 @@ def play_arpeggio_notes(
         play_note(note_name, selected_port_in, selected_port_out)
         # Esperamos un tiempo entre notas calculado con el tempo y el compás
         next_note_time = start_time + time_between_notes
-        while time.time() < next_note_time:
-            time.sleep(0.01)
+        current_time = time.perf_counter()
+
+        while current_time < next_note_time:
+            time.sleep(max(0.001, next_note_time - current_time))
+            current_time = time.perf_counter()
+
         # Detenemos la nota
         stop_note(note_name, selected_port_in, selected_port_out)
         start_time = next_note_time
@@ -1681,6 +1669,7 @@ def play_arpeggio(
 
         for note in list(active_notes):
             stop_note(note, selected_port_in, selected_port_out)
+            print(active_notes)
         current_shape = selected_shape.copy()
 
         # Procesarmos los triángulos y tocamos las notas correspondientes
