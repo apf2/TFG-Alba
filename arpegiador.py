@@ -16,6 +16,7 @@ dict_notes = {
     "B": 71,
 }
 
+
 # Convertimos las notas a valores midi
 def convert_note_to_midi(current_notes_set):
     midi_notes = []
