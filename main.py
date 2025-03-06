@@ -668,9 +668,9 @@ def get_midi_in(window, canvas, selected_port_in, triangle_ids):
 
     try:
         with mido.open_input(selected_port_in) as port:
+            notes = []
             print(f"Abierto puerto MIDI in: {selected_port_in}")
             while not midi_in_stop_event.is_set():
-                notes = []
                 # Procesamos todos los mensajes pendientes
                 for msg in port.iter_pending():
                     # La función hasattr nos dice si el mensaje contiene 'note'
@@ -683,10 +683,11 @@ def get_midi_in(window, canvas, selected_port_in, triangle_ids):
 
                     elif msg.type == "note_off":
                         if chord:
-                            notes = notes + [note_name]
+                            notes.append(note_name)
                             if len(notes) == 3:
                                 unmark_triangles(window, canvas, notes,
                                                  triangle_ids)
+                                notes = []
                         else:
                             unmark_notes(window, canvas, note_name)
                     else:
@@ -745,7 +746,6 @@ def get_midi_out(selected_port_out, triangle_ids):
 def move_triangles(window, canvas, triangle_ids, shapes_to_update):
     # Movemos los triángulos seleccionados
     for old_id, new_id in shapes_to_update["triangle"].items():
-        print(old_id, '-->', new_id)
         old_notes = triangle_ids[old_id]["notes"]
         new_notes = triangle_ids[new_id]["notes"]
 
