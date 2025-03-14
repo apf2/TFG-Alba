@@ -26,7 +26,7 @@ ROWS = 5
 COLUMNS = 14
 R_CIRCLE = 20
 C_MIDI = 60
-MAX_CHORD_INTERVAL = 0.25
+MAX_CHORD_INTERVAL = 0.5
 TRIANGLE = 115
 CONFIG_PATH = "config.yml"
 DURATION = 1500
@@ -117,6 +117,7 @@ note_times = {}
 circle_ids = {}
 last_chord = {}
 last_velocity = 64
+moving_triangle = False
 
 stop_event = None
 detect_note_thread = None
@@ -504,7 +505,7 @@ def unmark_triangles(window, canvas, notes, triangle_ids):
 
     try:
         for triangle_id, info in triangle_ids.items():
-            if set(info["notes"]) == set(notes):
+            if set(info["notes"]).issubset(set(notes)):
                 if triangle_id in selected_shapes:
                     # Cambiar el color del triángulo para marcarlo como seleccionado
                     canvas.itemconfig(triangle_id, fill="grey")
@@ -641,17 +642,20 @@ def detect_chord(window, canvas, note, triangle_ids):
         note_times[note] = current_time
 
     chord_notes = []
-    for note in list(note_times):
-        if current_time - note_times[note] <= MAX_CHORD_INTERVAL:
+    # Recorremos las notas activas para filtrar las que superaron el tiempo
+    for note, activation_time in list(note_times.items()):
+        if current_time - activation_time <= MAX_CHORD_INTERVAL:
             chord_notes.append(note)
         else:
-            note_times.pop(note, None)
+            del note_times[note]
 
     # Si el número de notas activas es múltiplo de 3 y mayor que 0, consideramos que es un acorde
-    if len(chord_notes) > 0 and len(chord_notes) % 3 == 0:
+    if len(chord_notes) >= 3:
         # Pintamos los triángulos asociados al acorde
         mark_triangles(window, canvas, chord_notes, triangle_ids)
-        return True
+        if any(shape_type == "triangle"
+               for shape_type in selected_shapes.values()):
+            return True
 
     return False
 
@@ -672,7 +676,7 @@ def convert_midi_to_note(message):
 
 def get_midi_in(window, canvas, selected_port_out, selected_port_in,
                 triangle_ids):
-    global last_chord, last_velocity
+    global last_chord, last_velocity, moving_triangle
 
     notes = []
     chord = False
@@ -691,8 +695,10 @@ def get_midi_in(window, canvas, selected_port_out, selected_port_in,
                     if hasattr(msg, "note"):
                         note_name = convert_midi_to_note(msg.note)
                     if msg.type == "note_on":
+                        if moving_triangle:
+                            unmark_shapes(window, canvas, selected_port_out)
                         last_velocity = msg.velocity
-                        if hold_on and len(notes) >= 3:
+                        if hold_on and chord:
                             stop_midi(selected_port_out, control=True)
                             unmark_shapes(window, canvas, selected_port_out)
                             notes = []
@@ -704,7 +710,7 @@ def get_midi_in(window, canvas, selected_port_out, selected_port_in,
 
                     elif msg.type == "note_off":
                         if chord:
-                            if len(notes) > 0 and len(notes) % 3 == 0:
+                            if len(set(notes)) >= 3:
                                 if not hold_on:
                                     unmark_triangles(window, canvas, notes,
                                                      triangle_ids)
@@ -715,6 +721,8 @@ def get_midi_in(window, canvas, selected_port_out, selected_port_in,
 
                         else:
                             unmark_notes(window, canvas, note_name)
+                            if note_name in notes:
+                                notes.remove(note_name)
                     else:
                         continue
 
@@ -767,8 +775,18 @@ def get_midi_out(selected_port_out, triangle_ids):
         time.sleep(0.001)
 
 
+# Función que se ejecuta después de DURATION
+def handle_unmark_and_stop_moving(window, canvas, notes, triangle_ids):
+    global moving_triangle
+
+    unmark_triangles(window, canvas, notes, triangle_ids)
+    moving_triangle = False
+
+
 # Función para mover los triángulos
 def move_triangles(window, canvas, triangle_ids, shapes_to_update):
+    global moving_triangle
+
     # Movemos los triángulos seleccionados
     for old_id, new_id in shapes_to_update["triangle"].items():
         old_notes = triangle_ids[old_id]["notes"]
@@ -781,9 +799,10 @@ def move_triangles(window, canvas, triangle_ids, shapes_to_update):
         mark_triangles(window, canvas, new_notes, triangle_ids)
 
         if not hold_on:
+            moving_triangle = True
             window.after(
-                DURATION, lambda: unmark_triangles(window, canvas, new_notes,
-                                                   triangle_ids))
+                DURATION, lambda: handle_unmark_and_stop_moving(
+                    window, canvas, new_notes, triangle_ids))
 
 
 # Manejamos el movimiento en modo navegación
@@ -889,7 +908,7 @@ def arpeggiator_loop(selected_port_out, triangle_ids, tempo, compas, octave):
         notes = arpegiador.get_arpeggio_notes(selected_shapes, triangle_ids,
                                               octave, arpeggiator_mode)
 
-        if notes == []:
+        if not notes:
             stop_midi(selected_port_out, control=True)
 
         for note in notes:
