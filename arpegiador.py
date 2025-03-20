@@ -44,11 +44,11 @@ def calculate_time_between_notes(tempo, compas):
 
 # Extiende las notas la octava que se haya marcado
 def extend_octave(notes_to_play, octave):
-    extended_notes = set()
+    extended_notes = []
 
     for midi_note in notes_to_play:
         for i in range(octave.get()):
-            extended_notes.add(midi_note + i * 12)
+            extended_notes.append(midi_note + i * 12)
 
     return sorted(list(extended_notes))
 
@@ -69,7 +69,9 @@ def order_arpeggio_notes(midi_notes, type):
 
 
 # Obtiene las notas ordenadas que deben sonar
-def get_arpeggio_notes(selected_shapes, triangle_ids, octave, mode):
+def get_arpeggio_notes(selected_shapes, triangle_ids, compas, octave, mode):
+    compas_value = compas.get()
+
     notes_to_play = []
     for shape_id, shape_type in selected_shapes.items():
         if shape_type == "triangle":
@@ -78,6 +80,14 @@ def get_arpeggio_notes(selected_shapes, triangle_ids, octave, mode):
 
     unique_notes = set(notes_to_play)
     midi_notes = convert_note_to_midi(unique_notes)
-    extended_notes = extend_octave(midi_notes, octave)
 
-    return order_arpeggio_notes(extended_notes, mode)
+    compas_value.split('/')
+    # Si el compás necesita 4 notas por compás repetimos la primera
+    if int(compas_value[0]) % 3 != 0:
+        if midi_notes:
+            midi_notes.append(midi_notes[0])
+
+    extended_notes = extend_octave(midi_notes, octave)
+    ordered_notes = order_arpeggio_notes(extended_notes, mode)
+
+    return ordered_notes

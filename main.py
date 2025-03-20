@@ -326,11 +326,14 @@ def draw_circles(
     triangle_ids,
     size_factor,
 ):
-    global circle_ids
+    global circle_ids, notes_in_order
     i = 0
     # Guardamos las coordenadas donde se ha pintado una nota ya
     painted_coords = {}
     size_factor_value = float(size_factor.get())
+
+    # Guardamos una versión visual de las notas con "♭", pero sin modificar las originales
+    notes_visual = [note.replace("b", "♭") for note in notes_in_order]
 
     for triangle_coord in circle_coords:
         for coords in triangle_coord:
@@ -340,6 +343,7 @@ def draw_circles(
             # Vemos si las coordenadas redondeadas están o no en painted_coords
             if rounded_coords not in painted_coords:
                 note = notes_in_order[i]
+                note_visual = notes_visual[i]
                 if dark_mode:
                     # Imprimimos el círculo
                     circle = c.create_oval(
@@ -351,7 +355,7 @@ def draw_circles(
                         outline="white",
                     )
                     # Imprimimos la nota
-                    text = c.create_text(x, y, text=note, fill="white")
+                    text = c.create_text(x, y, text=note_visual, fill="white")
                 else:
                     # Imprimimos el círculo
                     circle = c.create_oval(
@@ -362,7 +366,7 @@ def draw_circles(
                         fill="white",
                     )
                     # Imprimimos la nota
-                    text = c.create_text(x, y, text=note, fill="black")
+                    text = c.create_text(x, y, text=note_visual, fill="black")
 
                 # Añadimos esta coordenada al diccionario con la nota que le corresponde
                 painted_coords[rounded_coords] = {
@@ -906,7 +910,7 @@ def arpeggiator_loop(selected_port_out, triangle_ids, tempo, compas, octave):
             tempo, compas)
         # Obtenemos las notas ordenadas del arpegiador
         notes = arpegiador.get_arpeggio_notes(selected_shapes, triangle_ids,
-                                              octave, arpeggiator_mode)
+                                              compas, octave, arpeggiator_mode)
 
         if not notes:
             stop_midi(selected_port_out, control=True)
