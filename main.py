@@ -768,7 +768,7 @@ def get_midi_out(selected_port_out, triangle_ids):
                         break
 
             # Si el nuevo acorde es diferente del que ya estaba sonando
-            if new_active_notes != previous_active_notes:
+            if set(new_active_notes) != set(previous_active_notes):
                 if previous_active_notes:
                     stop_midi(selected_port_out)
                 active_notes = new_active_notes
@@ -1419,7 +1419,7 @@ def choose_compas(window):
     compas_frame = tk.Frame(window, bg=window.cget("bg"))
     compas_frame.pack(side=tk.LEFT, padx=5)
 
-    compases = ["2/4", "3/4", "4/4", "6/8"]
+    compases = ["2/4", "3/4", "4/4"]
 
     compas = tk.StringVar(window)
     # Compás por defecto
