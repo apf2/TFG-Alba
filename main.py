@@ -22,16 +22,16 @@ Además para algunas funciones de mido se necesita instalar en el terminal
 esto es para las funciones mido.get_input_names() y mido.open_input()
 """
 
-ROWS = 5
-COLUMNS = 14
-R_CIRCLE = 20
-C_MIDI = 60
-MAX_CHORD_INTERVAL = 0.5
-TRIANGLE = 115
-CONFIG_PATH = "config.yml"
-DURATION = 1500
+ROWS = 5  # Número de filas en la matriz de triángulos
+COLUMNS = 14  # Número de columnas en la matriz de triángulos
+R_CIRCLE = 20  # Radio del círculo
+C_MIDI = 60  # Nota MIDI inicial
+MAX_CHORD_INTERVAL = 0.5  # Intervalo de tiempo entre notas para detectar un acorde
+TRIANGLE = 115  # Lado del triángulo
+CONFIG_PATH = "config.yml"  # Ruta del archivo de configuración
+DURATION = 1500  # Duración de un acorde tras mover las flechas
 
-# Diccionario de configuración
+# Diccionario de configuración inicial
 config = {
     "size_factor": 1.0,
     "port_in": "no-midi",
@@ -39,105 +39,107 @@ config = {
     "dark_mode": False,
 }
 
-# Lista de notas para el orden gráfico
-notes_in_order = [
-    "Bb",
-    "Db",
-    "Gb",
-    "F",
-    "Ab",
-    "C",
-    "Eb",
-    "G",
-    "Bb",
-    "D",
-    "F",
-    "A",
-    "C",
-    "E",
-    "G",
-    "B",
-    "A",
-    "E",
-    "B",
-    "Gb",
-    "Db",
-    "Ab",
-    "Eb",
-    "Bb",
-    "C",
-    "F",
-    "G",
-    "D",
-    "A",
-    "E",
-    "B",
-    "Gb",
-    "Ab",
-    "Eb",
-    "Bb",
-    "F",
-    "C",
-    "G",
-    "D",
-    "A",
-    "B",
-    "E",
-    "Gb",
-    "Db",
-    "Ab",
-    "Eb",
-    "Bb",
-    "F",
-]
-
-# Diccionario de notas con sus valores MIDI correspondientes
-dict_notes = {
-    "C": 60,
-    "Db": 61,
-    "D": 62,
-    "Eb": 63,
-    "E": 64,
-    "F": 65,
-    "Gb": 66,
-    "G": 67,
-    "Ab": 68,
-    "A": 69,
-    "Bb": 70,
-    "B": 71,
+# Configuración global del programa
+global_config = {
+    "arpeggiator_mode": "up",  # Modo del arpegiador (up, down, random)
+    "arpeggiator_active": False,  # Estado del arpegiador, si está activo o no
+    "last_velocity": 64,  # La velocidad (intensidad) de la última nota tocada
+    "moving_triangle": False,  # Indica si el triángulo está en movimiento
+    "hold_on": False,  # Indica si se debe mantener la última nota o no
+    "dark_mode": False,  # Configuración del modo oscuro
+    "screen_window": None,  # Referencia a la ventana de la pantalla
 }
 
-# Diccionario donde guardaremos las notas que estén activas
-active_notes = {}
-selected_shapes = {}
-previous_notes = []
-arpeggiator_mode = "up"
-arpeggiator_active = False
-note_times = {}
-circle_ids = {}
-last_chord = {}
-last_velocity = 64
-moving_triangle = False
+# Estado actual del MIDI, que almacena las notas activas y otras configuraciones
+midi_state = {
+    "active_notes": {},  # Diccionario de notas actualmente activas
+    "selected_shapes": {},  # Formas seleccionadas para representar visualmente
+    "note_times": {},  # Tiempos asociados con las notas activas
+    "circle_ids": {},  # IDs de los círculos
+    "last_chord": {},  # El último acorde tocado
+}
 
-stop_event = None
-detect_note_thread = None
-midi_in_stop_event = None
-midi_in_thread = None
-arpeggiator_thread = None
-arpeggiator_stop_event = None
-nav_thread = None
-nav_stop_event = None
+# Control de los hilos (threads) en ejecución y eventos relacionados
+threads_control = {
+    "stop_event": None,  # Evento que detiene el hilo de MIDI out
+    "detect_note_thread": None,  # Hilo para detectar notas MIDI out
+    "midi_in_stop_event": None,  # Evento para detener la entrada MIDI
+    "midi_in_thread": None,  # Hilo para procesar la entrada MIDI
+    "arpeggiator_thread": None,  # Hilo para el arpegiador
+    "arpeggiator_stop_event": None,  # Evento para detener el arpegiador
+    "nav_thread": None,  # Hilo para la navegación por flechas
+    "nav_stop_event": None,  # Evento para detener la navegación
+}
 
-hold_on = False
+# Estructuras de datos relacionadas con las notas y su orden
+data_structures = {
+    "notes_in_order": [
+        "Bb",
+        "Db",
+        "Gb",
+        "F",
+        "Ab",
+        "C",
+        "Eb",
+        "G",
+        "Bb",
+        "D",
+        "F",
+        "A",
+        "C",
+        "E",
+        "G",
+        "B",
+        "A",
+        "E",
+        "B",
+        "Gb",
+        "Db",
+        "Ab",
+        "Eb",
+        "Bb",
+        "C",
+        "F",
+        "G",
+        "D",
+        "A",
+        "E",
+        "B",
+        "Gb",
+        "Ab",
+        "Eb",
+        "Bb",
+        "F",
+        "C",
+        "G",
+        "D",
+        "A",
+        "B",
+        "E",
+        "Gb",
+        "Db",
+        "Ab",
+        "Eb",
+        "Bb",
+        "F",
+    ],  # Lista de notas en el orden en que deben aparecer en el diagrama
+    "dict_notes": {
+        "C": 60,
+        "Db": 61,
+        "D": 62,
+        "Eb": 63,
+        "E": 64,
+        "F": 65,
+        "Gb": 66,
+        "G": 67,
+        "Ab": 68,
+        "A": 69,
+        "Bb": 70,
+        "B": 71,
+    }  # Diccionario que asigna las notas a sus valores MIDI correspondientes
+}
 
-navigation_thread_active = threading.Event()
-arpeggiator_thread_active = threading.Event()
 
-screen_window = None
-dark_mode = False
-
-
-# Función de ChatGPT para comprobar las dependencias
 def check_dependences(dependencies):
     missing_dependencies = []
     for dependency in dependencies:
@@ -158,11 +160,7 @@ def check_dependences(dependencies):
         return message
 
 
-# Función de ChatGPT para simular mido.open_output() para cuando no hay puerto MIDI
-# La función general de ChatGPT la modificamos y separamos en dos funciones
 def simulated_notes(message):
-    global active_notes
-
     if message.type == "note_on":
         simulated_note_on(message)
     elif message.type == "note_off":
@@ -173,17 +171,17 @@ def simulated_notes(message):
 
 # Simula mensaje MIDI note_on
 def simulated_note_on(message):
-    global active_notes
+    global midi_state
 
-    active_notes.append(message.note)
+    midi_state["active_notes"].append(message.note)
 
 
 # Simula mensaje MIDI note_off
 def simulated_note_off(message):
-    global active_notes
+    global midi_state
 
-    if message.note in active_notes:
-        active_notes.remove(message.note)
+    if message.note in midi_state["active_notes"]:
+        midi_state["active_notes"].remove(message.note)
 
 
 # Si existe el fichero de configuración carga el puerto anteriormente seleccionado y no hace falta seleccionarlo
@@ -284,22 +282,22 @@ def click_triangle_events(
 
 # Controlamos cuando el triángulo está clicado
 def handle_triangle_click(window, canvas, notes, triangle_ids):
-    global last_chord, hold_on, selected_shapes
+    global midi_state
+
     # Si hay un triángulo marcado y es distinto del actual desmarcamos
-    if last_chord and set(notes) != set(last_chord):
+    if midi_state["last_chord"] and set(notes) != set(midi_state["last_chord"]):
         # Desmarcamos de la selección anterior
-        unmark_triangles(window, canvas, last_chord, triangle_ids)
+        unmark_triangles(window, canvas, midi_state["last_chord"], triangle_ids)
     # Ahora marcamos el triángulo actual
     mark_triangles(window, canvas, notes, triangle_ids)
     # Actualizamos last_chord con las notas del triángulo actual
-    last_chord = notes
+    midi_state["last_chord"] = notes
 
 
 # Controlamos cuando el triángulo deja de estar clicado
 def handle_triangle_unclick(window, canvas, notes, triangle_ids):
-    global hold_on
     # Si no estamos en modo hold_on, desmarcamos al soltar el botón
-    if not hold_on:
+    if not global_config["hold_on"]:
         unmark_triangles(window, canvas, notes, triangle_ids)
 
 
@@ -326,14 +324,16 @@ def draw_circles(
     triangle_ids,
     size_factor,
 ):
-    global circle_ids, notes_in_order
+    global global_config, midi_state, data_structures
     i = 0
     # Guardamos las coordenadas donde se ha pintado una nota ya
     painted_coords = {}
     size_factor_value = float(size_factor.get())
 
     # Guardamos una versión visual de las notas con "♭", pero sin modificar las originales
-    notes_visual = [note.replace("b", "♭") for note in notes_in_order]
+    notes_visual = [
+        note.replace("b", "♭") for note in data_structures["notes_in_order"]
+    ]
 
     for triangle_coord in circle_coords:
         for coords in triangle_coord:
@@ -342,9 +342,9 @@ def draw_circles(
             rounded_coords = (round(x, 2), round(y, 2))
             # Vemos si las coordenadas redondeadas están o no en painted_coords
             if rounded_coords not in painted_coords:
-                note = notes_in_order[i]
+                note = data_structures["notes_in_order"][i]
                 note_visual = notes_visual[i]
-                if dark_mode:
+                if global_config["dark_mode"]:
                     # Imprimimos el círculo
                     circle = c.create_oval(
                         x - R_CIRCLE * size_factor_value,
@@ -374,7 +374,10 @@ def draw_circles(
                     "circle_id": circle,
                     "text_id": text,
                 }
-                circle_ids[circle] = {"coords": (x, y), "note": note}
+                midi_state["circle_ids"][circle] = {
+                    "coords": (x, y),
+                    "note": note
+                }
                 click_circle_events(window, c, circle, text, note)
 
                 i += 1
@@ -382,29 +385,29 @@ def draw_circles(
     # Comprobamos las notas asociadas
     check_triangle_notes(painted_coords, triangle_ids)
 
-    return painted_coords, circle_ids, triangle_ids
+    return painted_coords, midi_state["circle_ids"], triangle_ids
 
 
 # Genera la nota que hemos clicado
 def play_midi(selected_port_out):
-    global active_notes, last_velocity
+    global global_config, midi_state
 
     if hasattr(selected_port_out, "get") and isinstance(selected_port_out,
                                                         tk.StringVar):
         selected_port_out = selected_port_out.get()
 
     if selected_port_out == "no-midi" or selected_port_out == "No hay puertos MIDI":
-        for note in active_notes:
+        for note in midi_state["active_notes"]:
             simulated_notes(mido.Message("note_on", note=note))
         return
 
     try:
         with mido.open_output(selected_port_out) as port:
-            if selected_port_out and active_notes:
-                for note in active_notes:
+            if selected_port_out and midi_state["active_notes"]:
+                for note in midi_state["active_notes"]:
                     msg = mido.Message('note_on',
                                        note=note,
-                                       velocity=last_velocity)
+                                       velocity=global_config["last_velocity"])
                     port.send(msg)
 
     except OSError as e:
@@ -414,22 +417,22 @@ def play_midi(selected_port_out):
 
 # Dejamos de generar la nota que habíamos generado
 def stop_midi(selected_port_out, control=False):
-    global active_notes
+    global midi_state
 
     if hasattr(selected_port_out, "get") and isinstance(selected_port_out,
                                                         tk.StringVar):
         selected_port_out = selected_port_out.get()
 
     if selected_port_out == "no-midi" or selected_port_out == "No hay puertos MIDI":
-        for note in active_notes:
+        for note in midi_state["active_notes"]:
             simulated_notes(mido.Message("note_off", note=note))
-        active_notes.clear()
+        midi_state["active_notes"].clear()
         return
 
     try:
         with mido.open_output(selected_port_out) as port:
-            if selected_port_out and active_notes:
-                for note in active_notes:
+            if selected_port_out and midi_state["active_notes"]:
+                for note in midi_state["active_notes"]:
                     if control:
                         msg = mido.Message('control_change',
                                            channel=0,
@@ -439,7 +442,7 @@ def stop_midi(selected_port_out, control=False):
                         msg = mido.Message('note_off', note=note)
                     port.send(msg)
 
-        active_notes.clear()
+        midi_state["active_notes"].clear()
     except OSError as e:
         print("Error al abrir el puerto MIDI:", e)
     return
@@ -447,13 +450,13 @@ def stop_midi(selected_port_out, control=False):
 
 # Marca la nota si ha sido detectada por MIDI
 def mark_notes(canvas, note):
-    global selected_shapes, circle_ids
+    global midi_state
     try:
         # Iterar sobre circle_ids, que es más simple que painted_coords
-        for circle_id, info in circle_ids.items():
+        for circle_id, info in midi_state["circle_ids"].items():
             if info["note"] == note:
-                if circle_id not in selected_shapes:
-                    selected_shapes[circle_id] = "circle"
+                if circle_id not in midi_state["selected_shapes"]:
+                    midi_state["selected_shapes"][circle_id] = "circle"
                 # Cambiar el color del círculo seleccionado
                 canvas.itemconfig(circle_id, fill="#fcc035")
 
@@ -463,12 +466,12 @@ def mark_notes(canvas, note):
 
 # Desmarca la nota cuando ya no es detectada
 def unmark_notes(window, canvas, note):
-    global selected_shapes, circle_ids
+    global midi_state
     try:
-        for circle_id, info in circle_ids.items():
+        for circle_id, info in midi_state["circle_ids"].items():
             if info["note"] == note:
-                if circle_id in selected_shapes:
-                    selected_shapes.pop(circle_id, None)
+                if circle_id in midi_state["selected_shapes"]:
+                    midi_state["selected_shapes"].pop(circle_id, None)
                 # Restablece el color del círculo a blanco
                 canvas.itemconfig(circle_id, fill=window.cget("bg"))
 
@@ -483,17 +486,17 @@ def mark_triangles(
     notes,
     triangle_ids,
 ):
-    global selected_shapes, circle_ids, last_chord
+    global midi_state
     try:
         # Iterar sobre los triángulos y verificar si coincide con las coordenadas proporcionadas
         for triangle_id, info in triangle_ids.items():
             # En caso de que exista last_chord ponemos sin color los triángulos antes de marcar los nuevos
-            if set(last_chord) == set(info["notes"]):
+            if set(midi_state["last_chord"]) == set(info["notes"]):
                 canvas.itemconfig(triangle_id, fill=window.cget("bg"))
             if set(notes).issubset(set(
                     info["notes"])):  # Ponemos set para que no importe el orden
-                if triangle_id not in selected_shapes:
-                    selected_shapes[triangle_id] = "triangle"
+                if triangle_id not in midi_state["selected_shapes"]:
+                    midi_state["selected_shapes"][triangle_id] = "triangle"
                     # Cambiar el color del triángulo para marcarlo como seleccionado
                     canvas.itemconfig(triangle_id, fill="#7699d4")
                 for note in notes:
@@ -505,16 +508,16 @@ def mark_triangles(
 
 # Desmarca el triángulo si deja de ser tocado
 def unmark_triangles(window, canvas, notes, triangle_ids):
-    global selected_shapes, last_chord, hold_on
+    global global_config, midi_state
 
     try:
         for triangle_id, info in triangle_ids.items():
             if set(info["notes"]).issubset(set(notes)):
-                if triangle_id in selected_shapes:
+                if triangle_id in midi_state["selected_shapes"]:
                     # Cambiar el color del triángulo para marcarlo como seleccionado
                     canvas.itemconfig(triangle_id, fill="grey")
-                    selected_shapes.pop(triangle_id, None)
-                    last_chord = info["notes"]
+                    midi_state["selected_shapes"].pop(triangle_id, None)
+                    midi_state["last_chord"] = info["notes"]
 
                 for note in notes:
                     unmark_notes(window, canvas, note)
@@ -525,26 +528,26 @@ def unmark_triangles(window, canvas, notes, triangle_ids):
 
 # Desmarcamos tanto círculos como triángulos
 def unmark_shapes(window, canvas, selected_port_out):
-    global selected_shapes
+    global midi_state
 
-    shape_ids = list(selected_shapes.keys())
+    shape_ids = list(midi_state["selected_shapes"].keys())
     # Verificar si hay alguna forma seleccionada
-    if selected_shapes:
+    if midi_state["selected_shapes"]:
         # Iterar sobre todos los ID de las formas seleccionadas
         for shape_id in shape_ids:
             # Cambiar el color de todas las formas seleccionadas a blanco
             canvas.itemconfig(shape_id, fill=window.cget("bg"))
-            selected_shapes.pop(shape_id, None)
+            midi_state["selected_shapes"].pop(shape_id, None)
 
         # Limpiar la selección después de desmarcar todas las formas
         stop_midi(selected_port_out, control=True)
-        selected_shapes.clear()
-        active_notes.clear()
+        midi_state["selected_shapes"].clear()
+        midi_state["active_notes"].clear()
 
 
 # Crea los triángulos
 def triangles(window, c, size_factor):
-    global circle_ids
+    global midi_state
 
     size_factor_value = float(size_factor.get())
     triangle_side = TRIANGLE * size_factor_value
@@ -598,7 +601,7 @@ def triangles(window, c, size_factor):
                         (x - triangle_side / 2, y + triangle_height),
                     ]
 
-            if dark_mode:
+            if global_config["dark_mode"]:
                 # Dibujamos el triángulo
                 triangle_id = c.create_polygon(triangle_coords,
                                                fill=window.cget("bg"),
@@ -622,7 +625,7 @@ def triangles(window, c, size_factor):
             )
 
     # Mostramos los círculos con sus notas
-    painted_coords, circle_ids, triangle_ids = draw_circles(
+    painted_coords, _, triangle_ids = draw_circles(
         window,
         c,
         circle_coords,
@@ -642,23 +645,23 @@ def detect_chord(window, canvas, note, triangle_ids):
     current_time = time.time()
 
     # Si la nota aún no está en las notas activas la añadimos con su tiempo de activación
-    if note not in note_times:
-        note_times[note] = current_time
+    if note not in midi_state['note_times']:
+        midi_state['note_times'][note] = current_time
 
     chord_notes = []
     # Recorremos las notas activas para filtrar las que superaron el tiempo
-    for note, activation_time in list(note_times.items()):
+    for note, activation_time in list(midi_state['note_times'].items()):
         if current_time - activation_time <= MAX_CHORD_INTERVAL:
             chord_notes.append(note)
         else:
-            del note_times[note]
+            del midi_state['note_times'][note]
 
     # Si el número de notas activas es múltiplo de 3 y mayor que 0, consideramos que es un acorde
     if len(chord_notes) >= 3:
         # Pintamos los triángulos asociados al acorde
         mark_triangles(window, canvas, chord_notes, triangle_ids)
         if any(shape_type == "triangle"
-               for shape_type in selected_shapes.values()):
+               for shape_type in midi_state["selected_shapes"].values()):
             return True
 
     return False
@@ -670,7 +673,7 @@ def convert_midi_to_note(message):
     note_name = None
 
     # Recorremos el diccionario para buscar la nota correspondiente al valor MIDI
-    for note, value in dict_notes.items():
+    for note, value in data_structures['dict_notes'].items():
         if value == midi_note:
             note_name = note
             break
@@ -680,7 +683,7 @@ def convert_midi_to_note(message):
 
 def get_midi_in(window, canvas, selected_port_out, selected_port_in,
                 triangle_ids):
-    global last_chord, last_velocity, moving_triangle
+    global global_config, midi_state, threads_control
 
     notes = []
     chord = False
@@ -692,17 +695,17 @@ def get_midi_in(window, canvas, selected_port_out, selected_port_in,
     try:
         with mido.open_input(selected_port_in) as port:
             print(f"Abierto puerto MIDI in: {selected_port_in}")
-            while not midi_in_stop_event.is_set():
+            while not threads_control["midi_in_stop_event"].is_set():
                 # Procesamos todos los mensajes pendientes
                 for msg in port.iter_pending():
                     # La función hasattr nos dice si el mensaje contiene 'note'
                     if hasattr(msg, "note"):
                         note_name = convert_midi_to_note(msg.note)
                     if msg.type == "note_on":
-                        if moving_triangle:
+                        if global_config["moving_triangle"]:
                             unmark_shapes(window, canvas, selected_port_out)
-                        last_velocity = msg.velocity
-                        if hold_on and chord:
+                        global_config["last_velocity"] = msg.velocity
+                        if global_config["hold_on"] and chord:
                             stop_midi(selected_port_out, control=True)
                             unmark_shapes(window, canvas, selected_port_out)
                             notes = []
@@ -715,12 +718,12 @@ def get_midi_in(window, canvas, selected_port_out, selected_port_in,
                     elif msg.type == "note_off":
                         if chord:
                             if len(set(notes)) >= 3:
-                                if not hold_on:
+                                if not global_config["hold_on"]:
                                     unmark_triangles(window, canvas, notes,
                                                      triangle_ids)
                                     notes = []
                                 else:
-                                    last_chord = notes
+                                    midi_state["last_chord"] = {notes: True}
                                     notes = []
 
                         else:
@@ -736,23 +739,24 @@ def get_midi_in(window, canvas, selected_port_out, selected_port_in,
 
 
 def get_midi_out(selected_port_out, triangle_ids):
-    global selected_shapes, active_notes, stop_event, circle_ids
+    global global_config, midi_state, threads_control
 
     previous_active_notes = []
     print(f"Abierto puerto MIDI out: {selected_port_out}")
-    while not stop_event.is_set():
+    while not threads_control["stop_event"].is_set():
         new_active_notes = []
 
         # Si no hay figuras seleccionadas, y había notas sonando, mandamos note_off
-        if not selected_shapes:
+        if not midi_state["selected_shapes"]:
             if previous_active_notes:
                 stop_midi(selected_port_out, control=True)
                 previous_active_notes = []
         else:
             # Si hay triángulos seleccionados, obtenemos el acorde de uno de ellos
             if any(shape_type == "triangle"
-                   for shape_type in selected_shapes.values()):
-                for shape_id, shape_type in selected_shapes.items():
+                   for shape_type in midi_state["selected_shapes"].values()):
+                for shape_id, shape_type in midi_state["selected_shapes"].items(
+                ):
                     if shape_type == "triangle":
                         notes = triangle_ids[shape_id]["notes"]
                         new_active_notes = arpegiador.convert_note_to_midi(
@@ -760,9 +764,10 @@ def get_midi_out(selected_port_out, triangle_ids):
                         break
             else:
                 # Si solo hay círculos, obtenemos la nota asociada
-                for shape_id, shape_type in selected_shapes.items():
+                for shape_id, shape_type in midi_state["selected_shapes"].items(
+                ):
                     if shape_type == "circle":
-                        note = circle_ids[shape_id]["note"]
+                        note = midi_state["circle_ids"][shape_id]["note"]
                         new_active_notes = arpegiador.convert_note_to_midi(
                             [note])
                         break
@@ -771,8 +776,8 @@ def get_midi_out(selected_port_out, triangle_ids):
             if set(new_active_notes) != set(previous_active_notes):
                 if previous_active_notes:
                     stop_midi(selected_port_out)
-                active_notes = new_active_notes
-                if not arpeggiator_active:
+                midi_state["active_notes"] = new_active_notes
+                if not global_config["arpeggiator_active"]:
                     play_midi(selected_port_out)
                 previous_active_notes = new_active_notes.copy()
 
@@ -781,15 +786,15 @@ def get_midi_out(selected_port_out, triangle_ids):
 
 # Función que se ejecuta después de DURATION
 def handle_unmark_and_stop_moving(window, canvas, notes, triangle_ids):
-    global moving_triangle
+    global global_config
 
     unmark_triangles(window, canvas, notes, triangle_ids)
-    moving_triangle = False
+    global_config["moving_triangle"] = False
 
 
 # Función para mover los triángulos
 def move_triangles(window, canvas, triangle_ids, shapes_to_update):
-    global moving_triangle
+    global global_config
 
     # Movemos los triángulos seleccionados
     for old_id, new_id in shapes_to_update["triangle"].items():
@@ -802,8 +807,8 @@ def move_triangles(window, canvas, triangle_ids, shapes_to_update):
         # Marcamos el nuevo triángulo y sus notas
         mark_triangles(window, canvas, new_notes, triangle_ids)
 
-        if not hold_on:
-            moving_triangle = True
+        if not global_config["hold_on"]:
+            global_config["moving_triangle"] = True
             window.after(
                 DURATION, lambda: handle_unmark_and_stop_moving(
                     window, canvas, new_notes, triangle_ids))
@@ -816,18 +821,18 @@ def handle_key(
     canvas,
     triangle_ids,
 ):
-    global selected_shapes, last_chord
+    global midi_state
 
     shapes_to_update = {"triangle": {}, "circle": {}}
     selected_triangle_ids = []
 
     # Obtenemos todos los triángulos seleccionados
     for triangle_id, info in triangle_ids.items():
-        if set(info["notes"]) == set(last_chord):
+        if set(info["notes"]) == set(midi_state["last_chord"]):
             selected_triangle_ids.append(triangle_id)
 
     # Manejamos los triángulos
-    if last_chord:
+    if midi_state["last_chord"]:
         new_triangle_ids = []
         # Obtenemos todos los triángulos seleccionados
         for current_triangle_id in selected_triangle_ids:
@@ -863,7 +868,7 @@ def handle_key(
                 continue
 
             if new_triangle_id in triangle_ids and len(
-                    set(last_chord)
+                    set(midi_state["last_chord"])
                     & set(triangle_ids[new_triangle_id]["notes"])) >= 2:
                 new_triangle_ids.append(new_triangle_id)
                 # Actualizamos la estructura de shapes_to_update
@@ -874,7 +879,8 @@ def handle_key(
 
         # Actualizamos last_chord con las notas del último triángulo
         if new_triangle_ids:
-            last_chord = triangle_ids[new_triangle_ids[-1]]["notes"]
+            midi_state["last_chord"] = triangle_ids[
+                new_triangle_ids[-1]]["notes"]
 
 
 # Controlamos los eventos de las flechas del teclado
@@ -883,7 +889,7 @@ def nav_with_arrow_keys(
     canvas,
     triangle_ids,
 ):
-    global nav_stop_event
+    global threads_control
 
     window.bind("<Up>",
                 lambda event: handle_key(window, event, canvas, triangle_ids))
@@ -894,32 +900,33 @@ def nav_with_arrow_keys(
     window.bind("<Right>",
                 lambda event: handle_key(window, event, canvas, triangle_ids))
 
-    while not nav_stop_event.is_set():
+    while not threads_control["nav_stop_event"].is_set():
         time.sleep(0.001)
 
 
 # Función que ejecuta el bucle del arpegiador
 def arpeggiator_loop(selected_port_out, triangle_ids, tempo, compas, octave):
-    global arpeggiator_mode, selected_shapes, active_notes
+    global global_config, midi_state, threads_control
 
     next_note_time = time.perf_counter()
 
-    while not arpeggiator_stop_event.is_set():
+    while not threads_control["arpeggiator_stop_event"].is_set():
         # Calculamos el tiempo entre notas
         time_between_notes = arpegiador.calculate_time_between_notes(
             tempo, compas)
         # Obtenemos las notas ordenadas del arpegiador
-        notes = arpegiador.get_arpeggio_notes(selected_shapes, triangle_ids,
-                                              compas, octave, arpeggiator_mode)
+        notes = arpegiador.get_arpeggio_notes(midi_state["selected_shapes"],
+                                              triangle_ids, compas, octave,
+                                              global_config["arpeggiator_mode"])
 
         if not notes:
             stop_midi(selected_port_out, control=True)
 
         for note in notes:
-            if arpeggiator_stop_event.is_set():
+            if threads_control["arpeggiator_stop_event"].is_set():
                 break
 
-            active_notes = [note]
+            midi_state["active_notes"] = {note: True}
             # Tocamos la nota
             play_midi(selected_port_out)
 
@@ -948,14 +955,15 @@ def toggle_arpeggiator(
     compas,
     octave,
 ):
-    global arpeggiator_active, arpeggiator_thread, hold_on
-    arpeggiator_active = not arpeggiator_active
+    global global_config, threads_control
+    global_config[
+        "arpeggiator_active"] = not global_config["arpeggiator_active"]
 
     up_button = window.up_button
     down_button = window.down_button
     random_button = window.random_button
 
-    if arpeggiator_active:
+    if global_config["arpeggiator_active"]:
         start_arpeggiator_button.config(text="Arpegiador on")
         print("Arpegiador encendido")
 
@@ -969,7 +977,7 @@ def toggle_arpeggiator(
         start_hold_button.state(["!disabled"])
 
         if start_hold_button.cget("text") == "Hold on":
-            hold_on = True
+            global_config["hold_on"] = True
             start_hold_button.config(text="Hold on")
         else:
             start_hold_button.config(text="Hold off")
@@ -977,11 +985,11 @@ def toggle_arpeggiator(
     else:
         start_arpeggiator_button.config(text="Arpegiador off")
         print("Arpegiador apagado")
-        arpeggiator_active = False
-        hold_on = False
+        global_config["arpeggiator_active"] = False
+        global_config["hold_on"] = False
 
-        if arpeggiator_stop_event is not None:
-            arpeggiator_stop_event.set()
+        if threads_control["arpeggiator_stop_event"] is not None:
+            threads_control["arpeggiator_stop_event"].set()
 
         # Desmarcar todas las notas al apagar el arpegiador
         stop_midi(selected_port_out, control=True)
@@ -998,9 +1006,9 @@ def toggle_arpeggiator(
 
 # Función para controlar el modo hold on
 def toggle_hold_mode(window, canvas, start_hold_button, selected_port_out):
-    global hold_on
-    hold_on = not hold_on
-    if hold_on:
+    global global_config
+    global_config["hold_on"] = not global_config["hold_on"]
+    if global_config["hold_on"]:
         start_hold_button.config(text="Hold on")
     else:
         start_hold_button.config(text="Hold off")
@@ -1012,9 +1020,8 @@ def toggle_hold_mode(window, canvas, start_hold_button, selected_port_out):
 
 # Función para definir el estado del arpegiador
 def set_arpeggiator_mode(mode):
-    global arpeggiator_mode
-    if arpeggiator_active:
-        arpeggiator_mode = mode
+    if global_config["arpeggiator_active"]:
+        global_config["arpeggiator_mode"] = mode
         print(f"Modo del arpegiador cambiado a {mode}")
 
 
@@ -1024,9 +1031,10 @@ def start_nav_thread(
     canvas,
     triangle_ids,
 ):
-    global nav_thread, nav_stop_event
+    global threads_control
 
-    nav_stop_event = threading.Event()
+    threads_control["nav_stop_event"] = threading.Event()
+
     nav_thread = threading.Thread(
         target=nav_with_arrow_keys,
         args=(
@@ -1038,11 +1046,13 @@ def start_nav_thread(
     )
     nav_thread.start()
 
+    threads_control["nav_thread"] = nav_thread
+
 
 # Hilo para iniciar el control de puertos MIDI in
 def start_midi_in_thread(window, canvas, selected_port_out, selected_port_in,
                          triangle_ids):
-    global midi_in_thread, midi_in_stop_event, circle_ids
+    global midi_state, threads_control
 
     if isinstance(selected_port_in, tk.StringVar):
         selected_port_in = selected_port_in.get()
@@ -1051,14 +1061,14 @@ def start_midi_in_thread(window, canvas, selected_port_out, selected_port_in,
         selected_port_in = "no-midi"
 
     # Si ya existe un hilo, se le pide detenerse
-    if midi_in_stop_event is not None:
-        midi_in_stop_event.set()
-    if midi_in_thread is not None:
+    if threads_control["midi_in_stop_event"] is not None:
+        threads_control["midi_in_stop_event"].set()
+    if threads_control["midi_in_thread"] is not None:
         # Esperamos un máximo de 2 segundos a que se detenga
-        midi_in_thread.join(timeout=2)
+        threads_control["midi_in_thread"].join(timeout=2)
 
     # Se crea un nuevo evento de parada
-    midi_in_stop_event = threading.Event()
+    threads_control["midi_in_stop_event"] = threading.Event()
 
     # Se inicia el nuevo hilo con el puerto actualizado
     midi_in_thread = threading.Thread(target=get_midi_in,
@@ -1067,13 +1077,15 @@ def start_midi_in_thread(window, canvas, selected_port_out, selected_port_in,
                                       daemon=True)
     midi_in_thread.start()
 
+    threads_control["midi_in_thread"] = midi_in_thread
+
 
 # Hilo de ejecución para la detección de notas de MIDI out
 def start_midi_out_thread(
     selected_port_out,
     triangle_ids,
 ):
-    global detect_note_thread, stop_event
+    global threads_control
     """Vamos a crear un hilo para que la ejecución de la detección de notas esté
     en paralelo a la ventana con la imagen Ponemos daemon=True para que se
     termine la ejecución de la función al cerrar el programa En selected_port
@@ -1087,13 +1099,13 @@ def start_midi_out_thread(
     if selected_port_out == "No hay puertos MIDI":
         selected_port_out = "no-midi"
 
-    if stop_event is not None:
-        stop_event.set()
-    if detect_note_thread is not None:
-        detect_note_thread.join(timeout=2)
+    if threads_control["stop_event"] is not None:
+        threads_control["stop_event"].set()
+    if threads_control["detect_note_thread"] is not None:
+        threads_control["detect_note_thread"].join(timeout=2)
 
     # Se crea un nuevo evento de parada para el nuevo hilo.
-    stop_event = threading.Event()
+    threads_control["stop_event"] = threading.Event()
 
     detect_note_thread = threading.Thread(
         target=get_midi_out,
@@ -1105,11 +1117,14 @@ def start_midi_out_thread(
     )
     detect_note_thread.start()
 
+    # Guardamos el hilo en el diccionario de control
+    threads_control["detect_note_thread"] = detect_note_thread
+
 
 # Hilo para la ejecución del arpegiador
 def start_arpeggiator_thread(selected_port_out, triangle_ids, tempo, compas,
                              octave):
-    global arpeggiator_thread, arpeggiator_stop_event
+    global threads_control
 
     if isinstance(selected_port_out, tk.StringVar):
         selected_port_out = selected_port_out.get()
@@ -1119,13 +1134,13 @@ def start_arpeggiator_thread(selected_port_out, triangle_ids, tempo, compas,
         selected_port_out = "no-midi"
 
     # Si ya existe un hilo, se le pide detenerse
-    if arpeggiator_stop_event is not None:
-        arpeggiator_stop_event.set()
-    if arpeggiator_thread is not None:
-        arpeggiator_thread.join(timeout=2)
+    if threads_control["arpeggiator_stop_event"] is not None:
+        threads_control["arpeggiator_stop_event"].set()
+    if threads_control["arpeggiator_thread"] is not None:
+        threads_control["arpeggiator_thread"].join(timeout=2)
 
     # Crear un nuevo evento de parada
-    arpeggiator_stop_event = threading.Event()
+    threads_control["arpeggiator_stop_event"] = threading.Event()
 
     # Iniciar el nuevo hilo con el tempo actualizado
     arpeggiator_thread = threading.Thread(target=arpeggiator_loop,
@@ -1133,6 +1148,8 @@ def start_arpeggiator_thread(selected_port_out, triangle_ids, tempo, compas,
                                                 tempo, compas, octave),
                                           daemon=True)
     arpeggiator_thread.start()
+
+    threads_control["arpeggiator_thread"] = arpeggiator_thread
 
 
 # Actualiza en el fichero config el nuevo tamaño
@@ -1198,7 +1215,7 @@ def create_arpeggiator_frame(
     window.bind("<Configure>",
                 lambda event: update_position(arpeggiator_frame, window))
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         # Agregar un título al marco
         title_label = tk.Label(
             arpeggiator_frame,
@@ -1446,7 +1463,7 @@ def choose_octave(window):
     octave_frame = tk.Frame(window, bg=window.cget("bg"))
     octave_frame.pack(side=tk.LEFT, padx=10)
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         label = tk.Label(
             octave_frame,
             text="Extensión por:",
@@ -1474,7 +1491,7 @@ def choose_octave(window):
     )
     octaves_menu.pack(side=tk.LEFT, padx=5)
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         label = tk.Label(octave_frame,
                          text="octava",
                          bg=window.cget("bg"),
@@ -1649,13 +1666,13 @@ def choose_size_factor(window):
 
 # Manejamos el modo oscuro
 def toggle_dark_mode(window, screen_window, frame):
-    global dark_mode
+    global global_config
 
-    dark_mode = not dark_mode
+    global_config["dark_mode"] = not global_config["dark_mode"]
 
-    config["dark_mode"] = dark_mode
+    config["dark_mode"] = global_config["dark_mode"]
     save_config_file()
-    if dark_mode:
+    if global_config["dark_mode"]:
         window.config(bg="#404040")
         screen_window.config(bg="#404040")
         frame.config(bg="#404040")
@@ -1699,7 +1716,7 @@ def choose_dark_mode(
 # Creamos el scrollbar para las configuraciones
 def create_scrollbar(window):
     # Creamos un frame para el contenido desplazable
-    container = tk.Frame(screen_window)
+    container = tk.Frame(global_config["screen_window"])
     container.pack(fill="both", expand=True)
 
     # Canvas con el scrollbar
@@ -1732,20 +1749,25 @@ def screen_settings(
     midi_ports_in,
     midi_ports_out,
 ):
-    global screen_window
+    global global_config
+
     # Si ya existe una ventana de configuración de audio la cerramos
-    if screen_window is not None and screen_window.winfo_exists():
-        screen_window.destroy()
+    screen = global_config.get("screen_window")
+    if screen is not None and hasattr(screen,
+                                      "winfo_exists") and screen.winfo_exists():
+        screen.destroy()
 
     # Crear una nueva ventana para la configuración de pantalla
     screen_window = tk.Toplevel(window, bg=window.cget("bg"))
     screen_window.title("Configuración de Pantalla")
 
-    screen_position(window, screen_window, size_factor)
+    # Actualiza la variable global con la nueva ventana
+    global_config["screen_window"] = screen_window
 
+    screen_position(window, screen_window, size_factor)
     scrollable_frame = create_scrollbar(window)
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         label_size_selection = tk.Label(
             scrollable_frame,
             text="Selección del tamaño de la ventana",
@@ -1799,20 +1821,25 @@ def audio_settings(
     midi_ports_out,
     triangle_ids,
 ):
-    global screen_window
+    global global_config
+
     # Si ya existe una ventana de configuración de pantalla la cerramos
-    if screen_window is not None and screen_window.winfo_exists():
-        screen_window.destroy()
+    existing_window = global_config.get("screen_window")
+    if existing_window is not None and hasattr(
+            existing_window, "winfo_exists") and existing_window.winfo_exists():
+        existing_window.destroy()
 
     # Crear una nueva ventana para la configuración del audio
     screen_window = tk.Toplevel(window, bg=window.cget("bg"))
     screen_window.title("Configuración MIDI")
 
-    screen_position(window, screen_window, size_factor)
+    # Guardamos la nueva ventana en la configuración global
+    global_config["screen_window"] = screen_window
 
+    screen_position(window, screen_window, size_factor)
     scrollable_frame = create_scrollbar(window)
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         label_size_selection = tk.Label(
             scrollable_frame,
             text="Selección del puerto MIDI de entrada",
@@ -1842,7 +1869,7 @@ def audio_settings(
     separator = ttk.Separator(scrollable_frame, orient="horizontal")
     separator.pack(fill="x", pady=10)
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         label_size_selection = tk.Label(
             scrollable_frame,
             text="Selección del puerto MIDI de salida",
@@ -1933,8 +1960,6 @@ def menu(
 
 # Función para pintar el rectángulo
 def paint_rectangle(circle_coords):
-    global dark_mode
-
     # Obtener las coordenadas extremas de los triángulos
     min_x = float("inf")
     max_x = float("-inf")
@@ -1952,7 +1977,7 @@ def paint_rectangle(circle_coords):
     # Pintamos el rectángulo
     rectangle_coords = (min_x, min_y, max_x, max_y)
 
-    if dark_mode:
+    if global_config["dark_mode"]:
         rectangle = c.create_rectangle(rectangle_coords,
                                        width=4,
                                        outline="white")
@@ -1987,7 +2012,7 @@ def create_canvas(
         frame = tk.Frame(window)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        if dark_mode:
+        if global_config["dark_mode"]:
             window.config(bg="#404040")
         else:
             window.config(bg="white")
@@ -2075,7 +2100,7 @@ def buttons_design():
 
 
 def main():
-    global dark_mode
+    global global_config
 
     # Comprobamos que estén todas las librerías necesarias para que funcione el programa
     dependencies = [
@@ -2096,7 +2121,7 @@ def main():
     selected_port_in_from_config = selected_ports["port_in"]
     selected_port_out_from_config = selected_ports["port_out"]
 
-    dark_mode = config["dark_mode"]
+    global_config["dark_mode"] = config["dark_mode"]
 
     # Creamos la ventana y le ponemos un título
     window = tk.Tk()
